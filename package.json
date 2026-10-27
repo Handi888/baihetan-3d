@@ -1,0 +1,21 @@
+{
+  "name": "baihetan-study-scene",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node scripts/check-unified.mjs",
+    "audit": "node scripts/check-unified.mjs",
+    "build": "node scripts/build-site.mjs",
+    "build:entries": "node scripts/build-entry.mjs",
+    "check:public": "node scripts/check-public.mjs",
+    "deploy": "node scripts/publish.mjs",
+    "check:creatures": "node scripts/check-creatures.mjs",
+    "check:walking": "node scripts/check-walking.mjs"
+  },
+  "description": "Photo-referenced procedural Baihetan double-curvature arch dam. Local, offline-ready Three.js course exhibit.",
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

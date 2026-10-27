@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#142b30"><meta name="description" content="依据两张实拍图细化白鹤滩两岸分层弯折挡墙、裸岩、锚固和水岸交界的 Three.js 三维场景。">
+  <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <script>
+  // 双击本地 HTML 时显示启动指引；模块和共享模型由本机服务加载。
+  if(location.protocol==='file:')location.replace('./白鹤滩-坝库一体场景.html'+location.search+location.hash);
+  // 独立兜底：即使主程序因内核过旧/内存不足而未启动，加载页也不会永久黑屏。
+  window.__baihetanWatchdog=setTimeout(function(){
+    if(window.__APP_READY__)return;
+    var el=document.getElementById('loading');if(!el)return;
+    var ua=navigator.userAgent,old=/(CPU OS [0-9]|Android [0-7])\b/.test(ua);
+    el.innerHTML='<strong>三维场景加载超时</strong><small>'+(old?'当前系统版本过低，请升级微信/QQ或换用 Chrome 打开':'可能内存不足，请关闭后台网页后重试')+'</small><button onclick="location.reload()" style="margin-top:14px;padding:10px 22px;background:#304f40;color:#eff1d5;border:0;border-radius:3px">重新加载</button>';
+  },90000);
+  document.addEventListener('gesturestart',function(e){e.preventDefault();});
+  document.addEventListener('gesturechange',function(e){e.preventDefault();});
+  </script>
+  <title>白鹤滩 · 大坝与库区一体场景</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23142b30'/%3E%3Cpath d='M12 17 Q32 39 52 17 L47 48 Q32 57 17 48Z' fill='%23e4e4cd'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
+</head>
+<body>
+  <div id="viewport"><canvas id="scene" aria-label="可旋转的白鹤滩水电站三维场景"></canvas><div id="labels"></div></div>
+  <div id="loading"><span class="spinner"></span><strong>正在构建峡谷与拱坝</strong><small>程序化网格 · 本地资源</small></div>
+  <div id="restart-overlay"><strong id="restart-title">3D 渲染已中断</strong><small id="restart-sub" style="opacity:.7">通常是设备内存不足导致，点击下方按钮可恢复。</small><button onclick="location.reload()">重新加载场景</button></div>
+  <header class="ui masthead">
+    <div class="eyebrow"><span class="logo-mark">B.</span><span>BAIHETAN · SPATIAL STUDY</span><span class="edition">01 / 三维实景研习</span></div>
+    <h1>白鹤滩<span>从峡谷拱坝，到上游湖湾</span></h1>
+    <p>一片连通的水域，一座完整的坝库模型。</p>
+  </header>
+  <div class="ui top-actions"><button id="panel-toggle" class="panel-toggle">控制 ☰</button><button id="reference-button" title="逐张照片判读">照片与依据 <span>↗</span></button><button id="help-button" aria-label="使用帮助">?</button></div>
+  <div id="panel-backdrop"></div>
+  <button id="clean-view" title="隐藏或显示界面（H）">净览 <span>H</span></button>
+  <aside class="ui control-panel" aria-label="场景控制">
+    <div class="panel-heading"><span class="live-dot"></span>观察场景 <span class="panel-index">LIVE 3D</span></div>
+    <div class="district-views" role="group" aria-label="坝库一体导航"><button data-view="unified">坝库一体总览 ↗</button><button data-view="reservoir">上游湖湾</button><button data-view="park">滨水公园</button><button data-view="rockshore">库区岩岸</button></div>
+    <div class="view-list" role="group" aria-label="预设视角">
+      <button class="view active" data-view="downstream"><span class="view-num">01</span><span>下游全景<small>DOWNSTREAM</small></span><span class="view-arrow">↗</span></button>
+      <button class="view" data-view="upstream"><span class="view-num">02</span><span>上游视角<small>RESERVOIR</small></span><span class="view-arrow">↗</span></button>
+      <button class="view" data-view="overhead"><span class="view-num">03</span><span>坝顶俯瞰<small>CREST OVERVIEW</small></span><span class="view-arrow">↗</span></button>
+      <button class="view" data-view="side"><span class="view-num">04</span><span>侧面观察<small>ARCH PROFILE</small></span><span class="view-arrow">↗</span></button>
+    </div>
+    <div class="detail-views" role="group" aria-label="构件近看"><button data-view="bank">左侧挡墙</button><button data-view="rightbank">右侧挡墙</button><button data-view="shoreline">水岸接缝</button><button data-view="portal">隧洞洞口</button><button data-view="gantry">门机近看</button><button data-view="intake">进水口</button></div>
+    <div class="options">
+      <label><span>结构标注</span><input id="toggle-labels" type="checkbox"><span class="switch"></span></label>
+      <label><span>自动环绕</span><input id="toggle-orbit" type="checkbox"><span class="switch"></span></label>
+      <label><span>泄洪示意 <small>非仿真</small></span><input id="toggle-flow" type="checkbox"><span class="switch"></span></label>
+      <label><span>水面微动</span><input id="toggle-water" type="checkbox"><span class="switch"></span></label>
+      <label><span>水面网格</span><input id="toggle-water-wire" type="checkbox"><span class="switch"></span></label>
+      <label><span>跨谷输电线</span><input id="toggle-powerlines" type="checkbox"><span class="switch"></span></label>
+      <label><span>库区乔灌草</span><input id="toggle-plants" type="checkbox" checked><span class="switch"></span></label>
+      <label><span>灰模校对</span><input id="toggle-gray" type="checkbox"><span class="switch"></span></label>
+      <label class="quality-label"><span>画质</span><select id="quality" aria-label="画质"><option value="low">流畅</option><option value="medium">均衡</option><option value="high" selected>精细</option></select></label>
+    </div>
+    <button id="walk-button" class="secondary">第一人称漫游 · 方向键</button>
+    <button id="film-button" class="primary">▶ <span>26 秒镜头巡游</span><small>16:9</small></button>
+    <button id="record-button" class="secondary">◉ 录制并下载 WebM</button>
+    <p class="record-note">固定精细几何 · 画质仅调整渲染</p>
+  </aside>
+  <section class="ui model-caption"><div class="caption-tag">PHOTO-REFERENCED MODEL</div><h2 id="view-title">下游全景</h2><p id="view-subtitle">峡谷中的双曲拱坝</p><div class="scale-bar"><span></span><small>模型单位：米 · 照片近似</small></div></section>
+  <footer class="ui bottom-bar">
+    <div class="metrics"><div><strong>289<span>m</span></strong><small>最大坝高 · 比例锚点</small></div><div><strong>709<span>m</span></strong><small>坝顶弧长 · 非直线距离</small></div><div class="water-metric"><strong>双曲<span>拱坝</span></strong><small>水平拱曲 × 竖向曲率</small></div></div>
+    <div class="tools"><button id="pause-button" title="暂停或恢复全部动画（空格）">Ⅱ 暂停</button><button id="reset-button" title="恢复下游全景">↺ 重置</button><button id="capture-button" title="保存当前三维画面 PNG">↓ 截图</button></div>
+  </footer>
+  <div class="ui interaction-hint"><span class="desktop-hint">拖动旋转 <i>·</i> 滚轮缩放 <i>·</i> 右键平移</span> <span class="touch-hint">触屏：单指旋转，双指缩放 / 平移</span></div>
+  <div class="ui disclaimer">课程展示模型 · 非工程测绘复原</div>
+  <button id="exit-film" aria-label="退出录屏模式">退出巡游 <kbd>Esc</kbd></button>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <dialog id="reference-dialog"><div class="dialog-header"><div><small>READING THE LANDSCAPE</small><h2>从实拍到三维</h2></div><button data-close aria-label="关闭">×</button></div><p class="dialog-intro">合并模型以五张实拍图为依据：近景约束多层弯折挡墙、方形模板缝、排水洞、锚固岩坡和岩滩；全景约束拱坝、红色门机、两侧高边坡和蓝绿色河谷的整体关系。新增库区照片约束滨水公园、植被岩岸、梯田村落与远山。点击照片可查看完整原图。</p><div id="photo-grid"></div><div class="assumption"><h3>照片与尺度</h3><p>289 m 坝高与 709 m 坝顶弧长沿用原模型的比例锚点。挡墙分层、转折和材质按照片复原，未见尺寸与背面采用参数化估计。界面“左右侧”按下游看向坝体的画面命名，不据照片推断工程左右岸。湖湾相对于坝址的位置为参数化组合。“水面网格”可查看延伸到地形下方的完整三角形。</p><p id="geometry-report"></p></div></dialog>
+  <dialog id="help-dialog"><div class="dialog-header"><h2>观察与录制</h2><button data-close aria-label="关闭">×</button></div><p>鼠标左键旋转、滚轮缩放、右键平移；触屏单指旋转、双指缩放和平移。</p><p>点击“第一人称漫游”，在画面上点选地面、步道、坝顶或水面，出现光点后点击“确定从光点出发”。↑↓←→ 移动，鼠标直接转头；Shift＋左键同时按住可暂时固定视角，松开恢复。Space 跳跃，Shift 奔跑，Esc 退出；水中 Space 上浮、Ctrl 下潜。</p><p><kbd>1</kbd>—<kbd>4</kbd> 切换预设视角，<kbd>L</kbd> 标注，<kbd>Space</kbd> 暂停，<kbd>R</kbd> 重置，<kbd>F</kbd> 进入 26 秒镜头巡游，<kbd>Esc</kbd> 返回。</p><p>巡游以 16:9 画幅展示，包含下游远景、坝面观察、上游和坝顶俯瞰。画面中隐藏操作面板与标注。退出按钮在鼠标静止后淡出，支持触屏点按。</p><p>“录制并下载”使用浏览器 MediaRecorder 导出 1920×1080 WebM，无音轨；是否达到 30 fps 取决于设备。也可用系统录屏软件录制巡游。按 Esc 可提前结束并保存已录制片段。</p><p>默认静止水面、关闭泄洪。开启泄洪仅显示深孔水舌与雾气，属于视觉示意。</p><a href="README.md" target="_blank" rel="noopener">运行方式与项目结构 ↗</a></dialog>
+  <div id="walk-selection" hidden><p id="walk-pick-message" role="status">点击选择起点</p><div><button id="confirm-walk" disabled>确定从光点出发</button><button id="cancel-walk">取消 Esc</button></div></div>
+  <div id="walk-dot" hidden aria-label="选定的漫游起点"></div>
+  <div id="walk-hud"><div class="crosshair">+</div><div class="walk-help"><span class="walk-desktop-help">↑↓←→ 移动 · 鼠标转头 · Shift＋左键按住固定视角 · Space 跳跃 / 上浮 · Shift 奔跑 · Ctrl 下潜</span><span class="walk-touch-help">按方向键移动 · 拖动画面转头</span> <button id="exit-walk">退出 Esc</button></div>
+    <div class="walk-touch-controls" aria-label="触屏漫游控制">
+      <div class="walk-direction-pad"><button data-walk-key="ArrowUp" aria-label="向前">↑</button><button data-walk-key="ArrowLeft" aria-label="向左">←</button><button data-walk-key="ArrowDown" aria-label="向后">↓</button><button data-walk-key="ArrowRight" aria-label="向右">→</button></div>
+      <div class="walk-touch-actions"><button data-walk-key="Space">跳跃 / 上浮</button><button data-walk-key="ShiftLeft">奔跑</button><button data-walk-key="ControlLeft">下潜</button></div>
+    </div>
+  </div>
+    <script type="module" src="src/main.js"></script>
+</body>
+</html>
+

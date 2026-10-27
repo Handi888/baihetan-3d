@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>打开白鹤滩三维场景</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#102b2d;color:#eef2e5;font:16px/1.8 system-ui,"Microsoft YaHei",sans-serif}main{max-width:540px;margin:24px;padding:40px;border:1px solid #49605d;border-radius:16px;background:#193536}small{color:#aabfb6;letter-spacing:2px}h1{font-size:28px;margin:14px 0}strong{color:#f1deaa}ol{padding-left:24px}button{background:#e7ecd8;color:#183b36;border:0;border-radius:6px;padding:12px 20px;font:inherit;cursor:pointer}#status{color:#c1d5ca;min-height:3em;font-size:14px}</style></head>
+<body><main><small>BAIHETAN · 本地三维场景</small><h1>打开白鹤滩三维场景</h1>
+<ol><li>回到这个 HTML 所在的文件夹。</li><li>双击 <strong>启动预览.cmd</strong>（文件名也可能显示为“启动预览”）。</li><li>启动成功后，场景会自动在浏览器打开。</li></ol>
+<p>浏览期间请保留启动窗口；关闭它会停止本机预览。</p><p id="status" role="status">正在检查本机预览服务…</p><button id="retry">重新检测并打开</button></main>
+<script>
+const target='http://127.0.0.1:4173/index.html'+(location.search||'?view=downstream')+location.hash;
+if(location.protocol!=='file:')location.replace('./index.html'+location.search+location.hash);
+let attempt=0;
+function check(){
+  const id=++attempt,el=document.getElementById('status');el.textContent='正在检查本机预览服务…';
+  window.__BAIHETAN_PREVIEW_READY__=false;
+  const script=document.createElement('script');
+  const offline=()=>{if(id===attempt)el.textContent='预览服务尚未启动。请先双击同文件夹里的“启动预览”。';};
+  const timer=setTimeout(offline,2500);
+  script.onload=()=>{clearTimeout(timer);script.remove();if(id!==attempt)return;if(window.__BAIHETAN_PREVIEW_READY__)location.replace(target);else offline();};
+  script.onerror=()=>{clearTimeout(timer);script.remove();offline();};
+  script.src='http://127.0.0.1:4173/__baihetan/ready.js?t='+Date.now();document.head.append(script);
+}
+document.getElementById('retry').onclick=check;
+if(location.protocol==='file:')check();
+</script></body></html>
