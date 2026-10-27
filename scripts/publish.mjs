@@ -6,8 +6,17 @@ import path from 'node:path';
 import {githubCLI} from './gh-path.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const repo='Handi888/baihetan-3d',remote='https://github.com/'+repo+'.git';
+function execute(command,args,options={}){
+  // 仅重试 GitHub 的只读请求；创建仓库、提交和发布操作不盲目重复。
+  const readOnly=/(?:^|[\\/])gh(?:\.exe)?$/.test(command)&&((args[0]==='auth'&&args[1]==='status')||(args[0]==='api'&&!args.includes('--method')&&!args.includes('-X')));
+  for(let attempt=0;attempt<3;attempt++){
+    const result=spawnSync(command,args,{cwd:root,encoding:'utf8',windowsHide:true,...options});
+    if(attempt<2&&readOnly&&result.status!==0&&/\bEOF\b|connection reset|timed out|TLS handshake timeout|HTTP 50[234]/i.test(result.stderr||'')){Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,1500);continue;}
+    return result;
+  }
+}
 function run(command,args,options={}){
-  const result=spawnSync(command,args,{cwd:root,encoding:'utf8',windowsHide:true,...options});
+  const result=execute(command,args,options);
   if(result.error)throw result.error;
   if(result.status!==0)throw new Error((result.stderr||result.stdout||command+' failed').trim());
   return result.stdout.trim();
@@ -33,7 +42,7 @@ try{
   if(login.login.toLowerCase()!=='handi888')throw new Error('当前 GitHub 登录账号不是 Handi888，请切换账号后继续。');
   const currentRemote=spawnSync('git',['remote','get-url','origin'],{cwd:root,encoding:'utf8'});
   if(currentRemote.status===0&&currentRemote.stdout.trim()!==remote)throw new Error('已有不同 origin，保留现有仓库配置并停止。');
-  const repository=spawnSync(gh,['api','repos/'+repo],{cwd:root,encoding:'utf8',windowsHide:true});
+  const repository=execute(gh,['api','repos/'+repo]);
   if(repository.status!==0){
     if(!repository.stderr.includes('404'))throw new Error(repository.stderr);
     console.log(run(gh,['repo','create',repo,'--public','--description','Interactive Baihetan dam and reservoir landscape in Three.js']));
@@ -45,7 +54,7 @@ try{
   // 仅这一次 Git 调用使用已登录的 gh 凭据助手，不更改系统 Git 配置。
   const helper='!"'+gh.replaceAll('\\','/')+'" auth git-credential';
   console.log(run('git',['-c','credential.helper=','-c','credential.helper='+helper,'push','--set-upstream','origin','main']));
-  const pages=spawnSync(gh,['api','repos/'+repo+'/pages'],{cwd:root,encoding:'utf8',windowsHide:true});
+  const pages=execute(gh,['api','repos/'+repo+'/pages']);
   let pagesChanged=false;
   if(pages.status!==0){
     if(!pages.stderr.includes('404'))throw new Error(pages.stderr);
