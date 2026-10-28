@@ -12,6 +12,7 @@ import {createDam} from './src/dam.js';
 import {makeMaterials} from './src/materials.js';
 import {groundHeight} from './src/ground-surface.js';
 import {damPoint} from './src/math.js';
+import {PARAMS as P} from './src/config.js';
 const group=new THREE.Group();
 function box(name,size,pos){const m=new THREE.Mesh(new THREE.BoxGeometry(...size));m.name=name;m.position.set(...pos);group.add(m);}
 box('Concrete wall',[.25,3,8],[2,1.5,0]);box('Walk deck',[5,.3,5],[0,1.85,12]);box('Step slab',[2,.3,2],[0,.15,5]);group.updateMatrixWorld(true);
@@ -21,6 +22,11 @@ assert.equal(world.floor(0,12,.5),0,'Do not teleport onto overhead decks');
 assert(Math.abs(world.floor(0,5,.48)-.3)<1e-6,'Small step is walkable');
 assert(world.blocked(1.8,0,0),'Capsule stops before wall');assert(!world.blocked(1.2,0,0),'Open space stays traversable');
 assert(!world.blocked(1.8,0,3.1),'A wall below the feet does not block');
+const mapBounds={minX:-P.terrain.halfExtent+2,maxX:P.terrain.halfExtent-2,minZ:-P.terrain.upstreamExtent+2,maxZ:P.terrain.downstreamExtent-2};
+const boundedWorld=createWalkWorld([],groundHeight,mapBounds);
+for(const [x,z] of [[mapBounds.minX-1,0],[mapBounds.maxX+1,0],[0,mapBounds.minZ-1],[0,mapBounds.maxZ+1]]){
+  assert(boundedWorld.blocked(x,z,groundHeight(x,z)),'All four map edges block movement');assert.equal(boundedWorld.floor(x,z),-Infinity,'No clamped invisible floor beyond map');
+}
 const dam=createDam(makeMaterials());dam.updateMatrixWorld(true);const dw=createWalkWorld([dam],groundHeight),p=damPoint(-.55,289);
 const crest=dw.floor(p[0],p[2],291);assert(crest>=289&&crest<290,'Spawn is supported by actual crest surface');
 // 用实际控制器验证方向键与“不按鼠标键”的输入，覆盖内嵌浏览器拒绝指针锁的情况。
@@ -70,6 +76,9 @@ const c2=new THREE.PerspectiveCamera(),fast=createFirstPerson({canvas,rig:{camer
 fast.start();assert(!fast.pick(new THREE.Vector3(1.9,289,0)),'Reject spawn inside wall');assert(fast.pick(new THREE.Vector3(0,289,0)));fast.confirm();
 for(const code of ['ShiftLeft','ArrowRight'])window.emit('keydown',{code,preventDefault(){},stopImmediatePropagation(){}});
 fast.update(.5);assert(c2.position.x>1&&c2.position.x<1.53,'Fast movement stops before a thin wall');fast.stop();
-console.log(JSON.stringify({passed:true,crestFeet:crest,collisionCells:dw.cellCount,checks:['select then confirm','replace selected position','cancel selection','3x walk and sprint','four arrow directions','free mouse look','Shift-left freeze and seamless release','locked mouse look','fast thin-wall collision','unlock exit']}));
+const c3=new THREE.PerspectiveCamera(),edgeWalker=createFirstPerson({canvas,rig:{camera:c3,controls,setOrbit(){}},roots:[],heightAt:()=>289,bounds:{minX:-2,maxX:2,minZ:-2,maxZ:2},onStart(){},onChange(){}});
+edgeWalker.start();assert(!edgeWalker.pick(new THREE.Vector3(3,289,0)),'Reject off-map ground spawn');assert(!edgeWalker.pick(new THREE.Vector3(0,259,-3),true),'Reject off-map water spawn');assert(edgeWalker.pick(new THREE.Vector3(0,289,0)));edgeWalker.confirm();
+edgeWalker.setTouchKey('ArrowUp',true);edgeWalker.setTouchKey('ShiftLeft',true);edgeWalker.update(2);assert(c3.position.z>=-2&&c3.position.z< -1.8,'Long sprint cannot leave map');edgeWalker.stop();
+console.log(JSON.stringify({passed:true,crestFeet:crest,collisionCells:dw.cellCount,checks:['select then confirm','replace selected position','cancel selection','3x walk and sprint','four arrow directions','free mouse look','Shift-left freeze and seamless release','locked mouse look','fast thin-wall collision','unlock exit','four map boundaries','reject off-map ground and water spawns']}));
 `},outfile:out,bundle:true,platform:'node',format:'esm',alias:{three:path.join(root,'vendor/three.module.js')}});
 try{await import(pathToFileURL(out));}finally{await rm(out,{force:true});}

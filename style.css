@@ -97,3 +97,75 @@ body.selecting-walk #scene{cursor:crosshair}body.selecting-walk #labels,body.wal
   .walk-direction-pad button{font-size:23px}.walk-direction-pad button:first-child{grid-column:2}.walk-direction-pad button:nth-child(2){grid-column:1}
   .walk-touch-actions{display:grid;gap:6px}.walk-touch-actions button{font-size:12px;padding:8px 12px}
 }
+
+/* 地下电站教学视图：三维模型为主，右侧讲解卡在窄屏下改为底部面板。 */
+body.powerhouse .ui, body.powerhouse #clean-view,body.powerhouse #labels,body.powerhouse #panel-backdrop{display:none!important}
+#powerhouse-ui[hidden],#powerhouse-ui [hidden]{display:none!important}
+#powerhouse-ui{position:fixed;inset:0;z-index:25;pointer-events:none;color:#d9e8ed;font-family:Inter,"Microsoft YaHei",sans-serif}
+#powerhouse-ui button,#powerhouse-ui select,#powerhouse-ui input,#powerhouse-ui a{pointer-events:auto}
+#powerhouse-ui button{font:inherit;cursor:pointer;transition:background .18s,color .18s;border:1px solid #34505c;color:#d9e8ed;background:#142833;border-radius:5px;padding:10px 12px}
+#powerhouse-ui button:hover{background:#264550;border-color:#77bac9}
+#powerhouse-ui button:focus-visible,#powerhouse-ui select:focus-visible,#powerhouse-ui input:focus-visible{outline:2px solid #92e4f1;outline-offset:3px}
+.ph-heading{position:absolute;top:28px;left:32px}
+.ph-kicker{font-size:10px;letter-spacing:2.5px;color:#89b2bf}
+.ph-heading h1{font-size:27px;letter-spacing:2px;margin:9px 0 6px;font-weight:500;color:#f0f5f6}
+.ph-heading p{font-size:12px;margin:0;color:#87a6b3;letter-spacing:1px}
+#powerhouse-ui .ph-exit{position:absolute;top:28px;right:28px;background:transparent;border-color:#34505c;font-size:12px;padding:12px 16px}
+.ph-exit span{margin-left:18px;color:#83a3af}
+.ph-views{position:absolute;top:142px;left:32px;display:flex;gap:5px}
+#powerhouse-ui .ph-views button{font-size:12px;padding:10px 17px;border-radius:4px;background:#132833c9}
+#powerhouse-ui button[aria-pressed=true]{background:#bce3e4;color:#122b35;border-color:#bce3e4}
+.ph-panel{position:absolute;top:96px;right:28px;bottom:84px;width:302px;padding:20px;background:linear-gradient(145deg,#192f3bed,#0e202de8);border:1px solid #2a4655;border-radius:9px;box-shadow:0 18px 70px #0003;pointer-events:auto;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#385664 transparent}
+.ph-panel-top{display:flex;align-items:center;justify-content:space-between;color:#88bfc8;font-size:9px;letter-spacing:1.4px;gap:8px}
+#powerhouse-ui #ph-collapse{font-size:18px;line-height:16px;padding:1px 7px;border-color:transparent;background:transparent}
+.ph-panel h2{font-size:21px;font-weight:500;line-height:1.55;margin:20px 0 12px;color:#edf5f5}
+#ph-description{font-size:12px;line-height:1.95;color:#a9c0ca;margin:0 0 19px}
+.ph-steps{display:flex;gap:6px}
+#powerhouse-ui .ph-steps button{flex:1;font-size:12px;padding:8px 0;font-variant-numeric:tabular-nums}
+.ph-step-nav{display:flex;justify-content:space-between;gap:6px;margin:10px 0 3px}
+#powerhouse-ui .ph-step-nav button{font-size:10px;padding:6px 0;background:transparent;border:0;color:#b4cbd4}
+.ph-rule{height:1px;background:#2d4653;margin:15px 0}
+.ph-select-row{display:flex;gap:9px;margin-bottom:16px}
+.ph-select-row label{flex:1;font-size:10px;letter-spacing:1px;color:#8caab8}
+#powerhouse-ui select{width:100%;display:block;margin-top:6px;background:#0c202c;border:1px solid #34505c;color:#d9e8ed;border-radius:4px;font-size:12px;padding:8px 5px}
+.ph-option{display:flex;justify-content:space-between;align-items:center;font-size:12px;line-height:29px;color:#b8cdd5}
+.ph-option input{accent-color:#8cd6de;width:15px;height:15px;cursor:pointer}
+.ph-range{display:block;margin-top:15px;font-size:12px;color:#bbd0d8}
+.ph-range output{float:right;color:#8edfea;font-variant-numeric:tabular-nums}
+.ph-range input{display:block;width:100%;margin:12px 0;accent-color:#8edfea;cursor:pointer}
+.ph-note{font-size:10px;line-height:1.75;color:#85a2af;margin:8px 0 15px}
+.ph-playback{display:flex;gap:7px}
+#powerhouse-ui .ph-playback button{flex:1;font-size:11px;padding:10px 2px}
+.ph-footnote{font-size:9px;line-height:1.8;color:#7894a2;margin:16px 0 5px}
+.ph-source{font-size:10px;text-decoration:none;color:#8cb6c7;line-height:2}
+#ph-labels-layer{position:absolute;inset:0;pointer-events:none}
+.ph-label{position:absolute;font-size:11px;line-height:1.4;white-space:nowrap;display:flex;align-items:center;transform:translate(-7px,-7px);text-shadow:0 1px 5px #07111a}
+.ph-label i{display:block;width:5px;height:5px;border-radius:50%;background:currentColor;box-shadow:0 0 9px currentColor}
+.ph-label i::after{content:"";display:block;width:22px;height:1px;background:currentColor;opacity:.65;margin:2px 0 0 6px}
+.ph-label span{padding:5px 8px;margin-left:24px;border:1px solid #46616e88;background:#0a1a24d9;border-radius:3px}
+.ph-label b{font-size:9px;opacity:.6;font-weight:400;margin-right:6px}
+.water{color:#77d5e4}.mechanical{color:#cbd9df}.electric{color:#e5b777}
+.ph-bottom{position:absolute;bottom:25px;left:32px;right:32px;display:flex;align-items:center;justify-content:space-between;font-size:11px;gap:18px;color:#92adba;flex-wrap:wrap;border-top:1px solid #28424f;padding-top:18px}
+.ph-legend{display:flex;gap:23px;letter-spacing:1px}
+.ph-legend span::before{content:"";display:inline-block;width:17px;height:2px;vertical-align:middle;margin-right:8px;background:currentColor}
+.ph-bottom small{font-size:10px;opacity:.7}
+.ph-collapsed .ph-panel{bottom:auto;width:240px;padding:12px 16px}
+.ph-collapsed .ph-panel-content{display:none}
+@media(max-width:850px){
+ .ph-heading{top:20px;left:18px}.ph-heading h1{font-size:21px}.ph-heading p{font-size:10px}.ph-kicker{font-size:8px;letter-spacing:1.5px}
+ #powerhouse-ui .ph-exit{top:19px;right:15px;padding:9px;font-size:10px}.ph-exit span{display:none}
+ .ph-views{left:18px;top:112px}.ph-views button{padding:8px 12px!important;font-size:11px!important}
+ .ph-panel{top:auto;left:12px;right:12px;bottom:56px;width:auto;height:235px;padding:13px 16px}
+ .ph-panel h2{font-size:18px;margin:10px 0 7px}#ph-description{font-size:11px;line-height:1.8;margin-bottom:12px}
+ .ph-panel-top{position:sticky;top:-13px;background:#152b37;z-index:1;padding:7px 0;margin-top:-6px}
+ .ph-bottom{bottom:14px;left:18px;right:18px;padding-top:12px;gap:10px;font-size:10px}.ph-bottom small,#ph-model-status{display:none}
+ .ph-label{font-size:9px}.ph-label span{padding:4px}.ph-legend{gap:16px}
+ .ph-collapsed .ph-panel{left:12px;right:12px;bottom:56px;top:auto;width:auto;height:auto;padding:9px 14px}
+ .ph-collapsed .ph-panel-top{position:static;margin:0;padding:0}
+}
+@media(max-height:580px) and (min-width:851px){.ph-heading{top:15px}.ph-heading h1{font-size:23px}.ph-views{top:117px}.ph-panel{top:76px;bottom:64px}.ph-bottom{bottom:15px}}
+/* 简洁场景操作：四个视角、必要开关；署名独立于控制面板。 */
+.masthead h1{font-size:34px;margin:0;letter-spacing:5px}.control-panel{width:206px;top:82px;padding:16px}.view-list{margin:12px 0;gap:5px}.view{font-size:12px;padding:10px;justify-content:flex-start}.panel-index{display:none}.options{gap:15px}.bottom-bar{left:auto;right:34px;bottom:34px;padding:7px;background:#193b3bba}.tools button{padding:8px 11px}.creator-credit{position:fixed;left:18px;bottom:10px;max-width:calc(100vw - 36px);z-index:6;color:#edf2e8c9;font:10px/1.65 'Microsoft YaHei',sans-serif;text-shadow:0 1px 3px #122f31;pointer-events:none;letter-spacing:.15px}.clean .creator-credit{opacity:.5}.powerhouse .creator-credit{z-index:36;bottom:5px;font-size:9px}.ph-bottom{bottom:25px}.control-panel #powerhouse-button,.control-panel #walk-button{width:100%;margin:0}
+@media(max-width:800px){.masthead{top:16px;left:16px}.masthead h1{font-size:25px}.control-panel{width:auto;top:auto;bottom:95px;right:14px;left:14px}.view-list{grid-template-columns:repeat(2,1fr)}.view{justify-content:center;font-size:12px}.options{justify-content:space-between}.bottom-bar{right:14px;left:auto;bottom:55px}.tools button{font-size:11px;width:auto}.creator-credit{max-width:94%;left:12px;bottom:6px;font-size:9px}.ph-bottom{display:none}.powerhouse .creator-credit{z-index:55;bottom:3px;font-size:8px}.powerhouse .ph-panel{bottom:36px}}
+.ph-heading{color:#163944}.ph-heading p{color:#355b64}.ph-heading h1{text-shadow:0 1px 12px #fff8}.ph-exit{background:#193b46e6;color:#eef5f0}.ph-bottom{background:#193b46cf;padding:10px 12px;border-radius:3px}
+.control-panel>#powerhouse-button,.control-panel>#walk-button{grid-column:1/-1}

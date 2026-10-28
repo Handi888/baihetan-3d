@@ -42,6 +42,7 @@
 !/scripts/check-public.mjs
 !/scripts/check-creatures.mjs
 !/scripts/check-walking.mjs
+!/scripts/check-powerhouse.mjs
 !/scripts/check-unified.mjs
 !/scripts/build-entry.mjs
 !/scripts/publish.mjs

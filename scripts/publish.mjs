@@ -22,13 +22,13 @@ function run(command,args,options={}){
   return result.stdout.trim();
 }
 try{
-  for(const script of ['check-walking.mjs','check-creatures.mjs','build-site.mjs','check-public.mjs'])console.log(run(process.execPath,['scripts/'+script]));
+  for(const script of ['check-walking.mjs','check-creatures.mjs','check-powerhouse.mjs','build-site.mjs','check-public.mjs'])console.log(run(process.execPath,['scripts/'+script]));
   if(!existsSync(path.join(root,'.git')))run('git',['init','-b','main']);
   if(run('git',['branch','--show-current'])!=='main')throw new Error('请先切回 main 分支，再发布。');
   run('git',['add','--all']);
   // .gitignore 是允许清单，再检查实际跟踪内容，防止以后误加私人文件。
   const files=run('git',['ls-files','-z']).split('\0').filter(Boolean);
-  const allowed=/^(?:index\.html|style\.css|README\.md|package(?:-lock)?\.json|server\.mjs|(?:启动预览|更新网站|登录GitHub)\.cmd|白鹤滩-(?:坝库一体场景|高精度场景)\.html|\.gitignore|\.gitattributes|\.github\/workflows\/pages\.yml|src\/[\w/-]+\.js|vendor\/(?:three\.module\.js|OrbitControls\.js|README\.md|THREE-LICENSE\.txt)|assets\/creature\/runtime\/(?:creature\.mesh|color\.jpg|roughness\.jpg|metallic\.jpg)|references\/(?:bank-detail-20261015|canyon-20261015|park|rock-bank|panorama)\.jpg|reservoir-landscape\/index\.html|scripts\/(?:build-site|build-entry|check-public|check-creatures|check-walking|check-unified|publish|github-login|gh-path)\.mjs)$/;
+  const allowed=/^(?:index\.html|style\.css|README\.md|package(?:-lock)?\.json|server\.mjs|(?:启动预览|更新网站|登录GitHub)\.cmd|白鹤滩-(?:坝库一体场景|高精度场景)\.html|\.gitignore|\.gitattributes|\.github\/workflows\/pages\.yml|src\/[\w/-]+\.js|vendor\/(?:three\.module\.js|OrbitControls\.js|README\.md|THREE-LICENSE\.txt)|assets\/creature\/runtime\/(?:creature\.mesh|color\.jpg|roughness\.jpg|metallic\.jpg)|references\/(?:bank-detail-20261015|canyon-20261015|park|rock-bank|panorama)\.jpg|reservoir-landscape\/index\.html|scripts\/(?:build-site|build-entry|check-public|check-creatures|check-walking|check-powerhouse|check-unified|publish|github-login|gh-path)\.mjs)$/;
   for(const file of files){
     if(!allowed.test(file))throw new Error('阻止上传未列入允许清单的文件：'+file);
     if(/\.(?:js|mjs|html|css|md|json|yml|cmd)$/.test(file)){

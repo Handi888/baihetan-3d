@@ -15,8 +15,12 @@ export function proceduralMaterial(color,{rock=false,retaining=false,roughness=.
       vec3 p=vWorldPos;float relief=0.;
       ${rock?`
         vec3 w=pow(abs(normalize(vWorldNormal)),vec3(5.));w/=max(w.x+w.y+w.z,.001);
-        vec3 tex=texture2D(rockAlbedo,p.zy*.085).rgb*w.x+texture2D(rockAlbedo,p.xz*.085).rgb*w.y+texture2D(rockAlbedo,p.xy*.085).rgb*w.z;
-        relief=texture2D(rockRelief,p.zy*.085).r*w.x+texture2D(rockRelief,p.xz*.085).r*w.y+texture2D(rockRelief,p.xy*.085).r*w.z;
+        // 两个非整数尺度交错，打散同一张细岩纹的周期；几何只承担大尺度山形。
+        vec3 q=p+vec3(noise3(p*.009),noise3(p*.013+17.),noise3(p*.011+41.))*17.;
+        vec3 tex=texture2D(rockAlbedo,q.zy*.037).rgb*w.x+texture2D(rockAlbedo,q.xz*.037).rgb*w.y+texture2D(rockAlbedo,q.xy*.037).rgb*w.z;
+        vec3 tex2=texture2D(rockAlbedo,q.yz*.081+vec2(.37,.81)).rgb*w.x+texture2D(rockAlbedo,q.zx*.081+vec2(.37,.81)).rgb*w.y+texture2D(rockAlbedo,q.yx*.081+vec2(.37,.81)).rgb*w.z;
+        tex=mix(tex,tex2,.32);
+        relief=texture2D(rockRelief,q.zy*.037).r*w.x+texture2D(rockRelief,q.xz*.037).r*w.y+texture2D(rockRelief,q.xy*.037).r*w.z;
         float macro=noise3(p*.017),streak=noise3(vec3(p.x*.36,p.y*.008,p.z*.31));
         float engineered=(1.-smoothstep(500.,920.,abs(p.z)))*(1.-smoothstep(400.,470.,p.y));
         float growth=smoothstep(.23,.65,noise3(p*.012)*.55+noise3(p*.047)*.3+noise3(p*.16)*.15)*(1.-engineered*.98);
@@ -24,13 +28,13 @@ export function proceduralMaterial(color,{rock=false,retaining=false,roughness=.
         // The colour transition follows the rock, never distorts the fixed geometry.
         vec3 cutRock=mix(vec3(.56,.51,.46),vec3(.48,.51,.53),smoothstep(-160.,160.,p.x));
         vec3 mineral=mix(vec3(.51,.46,.40),cutRock,engineered);
-        mineral=mix(mineral,vec3(.065,.16,.09),growth*.72);
-        float joints=pow(abs(sin(p.y*.16+p.z*.028+noise3(p*.022)*1.9)),36.);
+        mineral=mix(mineral,vec3(.045,.12,.055),growth*.92);
+        float joints=1.-smoothstep(.014,.065,abs(noise3(vec3(p.x*.043,p.y*.11,p.z*.052))-.5));
         // Multiscale near-vertical seepage follows the excavation face. Pale
         // mineral wash and dark wet tracks are both visible in all four photos.
         float seepage=pow(noise3(vec3(p.x*.58,p.y*.006,p.z*.61)),2.5);
         float wash=pow(noise3(vec3(p.x*.22,p.y*.014,p.z*.27)),4.);
-        float bore=pow(abs(sin((p.x+p.z)*2.1+noise3(p*.06)*2.)),24.);
+        float bore=0.;
         vec3 weathered=mineral*(.48+tex*1.1)*(1.+(macro-.5)*.48-(1.-streak)*engineered*.12-joints*.12-seepage*engineered*.45+wash*engineered*.3-bore*engineered*.05);
         float waterline=mix(259.,24.,smoothstep(-180.,10.,p.z));
         float rockBeach=exp(-abs(p.y-waterline-1.8)/3.8);
@@ -47,7 +51,7 @@ export function proceduralMaterial(color,{rock=false,retaining=false,roughness=.
         terrainColor=mix(terrainColor,soil,terrace*.38);
         terrainColor=mix(terrainColor,weathered*.68,(1.-smoothstep(-.3,3.,localY))*.85);
         diffuseColor.rgb*=mix(weathered,terrainColor,district);
-        relief=relief*.34+noise3(p*.8)*.055;
+        relief=relief*.055+noise3(p*.8)*.008;
       `:retaining?`
         // 2.4 m square formwork panels measured along the wall, not screen pixels.
         // Derivative filtering preserves thin joints without distant moire.
@@ -82,8 +86,8 @@ export function proceduralMaterial(color,{rock=false,retaining=false,roughness=.
   m.customProgramCacheKey=()=>rock?'fractured-bank-rock-v7':retaining?'square-formwork-wall-v2':'cast-concrete-weather-v4';return m;
 }
 export function makeMaterials(){return {
-  concrete:proceduralMaterial(0xc4c7c5),darkConcrete:proceduralMaterial(0x8b9294),rock:proceduralMaterial(0xb1b5b6,{rock:true}),
-  retaining:proceduralMaterial(0xc7c6bd,{retaining:true,roughness:.9}),
+  concrete:proceduralMaterial(0xb3b9b4),damConcrete:proceduralMaterial(0x9fa9a5),darkConcrete:proceduralMaterial(0x7a8585),rock:proceduralMaterial(0xabb0ab,{rock:true}),
+  retaining:proceduralMaterial(0xadb1a5,{retaining:true,roughness:.9}),
   asphalt:new THREE.MeshStandardMaterial({color:0x878f89,roughness:.94}),rail:new THREE.MeshStandardMaterial({color:0x9ca9a7,roughness:.48,metalness:.68}),
   gate:new THREE.MeshStandardMaterial({color:0x34464a,roughness:.68,metalness:.5,side:THREE.DoubleSide}),sealed:proceduralMaterial(0xa6afa4),
   red:new THREE.MeshStandardMaterial({color:0xbd251d,roughness:.48,metalness:.35}),glass:new THREE.MeshStandardMaterial({color:0x305060,roughness:.18,metalness:.35}),

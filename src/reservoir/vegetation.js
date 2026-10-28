@@ -1,10 +1,11 @@
 import * as THREE from 'three';
+import {PARAMS as P} from '../config.js';
 import {heightAt,surfaceNormal,southShore,northShore,pathZ,DECK,noise,rng} from './landscape.js';
 
 // 以枝叶簇为原型，而不是圆球树冠。每个原型有真实树干/分枝和多方向叶片。
 // 同种植被复用完整原型的 InstancedMesh；无 LOD，也不按画质减株数。
 const wind={value:0};
-function sprigTexture(){
+export function sprigTexture(){
   if(typeof document==='undefined'){const t=new THREE.DataTexture(new Uint8Array([255,255,255,255]),1,1);t.needsUpdate=true;return t;}
   const canvas=document.createElement('canvas');canvas.width=canvas.height=512;const c=canvas.getContext('2d');
   const random=rng(8729);c.lineCap='round';
@@ -24,14 +25,14 @@ function sprigTexture(){
 function joined(parts){const positions=[],normals=[],uvs=[];for(const {g,matrix} of parts){const a=g.index?g.toNonIndexed():g;const p=a.attributes.position,n=a.attributes.normal,u=a.attributes.uv;const nm=new THREE.Matrix3().getNormalMatrix(matrix),v=new THREE.Vector3();for(let i=0;i<p.count;i++){v.fromBufferAttribute(p,i).applyMatrix4(matrix);positions.push(v.x,v.y,v.z);v.fromBufferAttribute(n,i).applyMatrix3(nm).normalize();normals.push(v.x,v.y,v.z);uvs.push(u?u.getX(i):0,u?u.getY(i):0);}if(a!==g)a.dispose();g.dispose();}
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(normals,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));g.computeBoundingSphere();return g;}
 function branch(a,b,r0,r1,segments=7){const p=new THREE.Vector3(...a),q=new THREE.Vector3(...b),d=q.clone().sub(p),matrix=new THREE.Matrix4().compose(p.clone().add(q).multiplyScalar(.5),new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),d.clone().normalize()),new THREE.Vector3(1,1,1));return {g:new THREE.CylinderGeometry(r1,r0,d.length(),segments,1),matrix};}
-function foliageGeometry(seed,height,radius,count){
+export function foliageGeometry(seed,height,radius,count,leafScale=1){
   const random=rng(seed),p=[],n=[],uv=[],idx=[],up=new THREE.Vector3(0,1,0);
   for(let i=0;i<count;i++){
     const az=random()*Math.PI*2,v=random()*2-1,rr=radius*Math.cbrt(random()),rad=Math.sqrt(1-v*v);
     const center=new THREE.Vector3(Math.cos(az)*rr*rad,height*.70+v*height*.28,Math.sin(az)*rr*rad);
     const normal=new THREE.Vector3(Math.cos(az)*.5,.55+random()*.55,Math.sin(az)*.5).normalize();
     const right=new THREE.Vector3().crossVectors(normal,up).normalize();if(right.lengthSq()<.1)right.set(1,0,0);
-    const vertical=new THREE.Vector3().crossVectors(right,normal).normalize(),size=.95+random()*.9;
+    const vertical=new THREE.Vector3().crossVectors(right,normal).normalize(),size=(.95+random()*.9)*leafScale;
     // 三向交错簇片。倾角和大小不统一，可近看叶片轮廓和枝脉。
     const turn=random()*Math.PI*2;right.applyAxisAngle(normal,turn);vertical.applyAxisAngle(normal,turn);
     const base=p.length/3;
@@ -46,7 +47,7 @@ function windMaterial(m,height=8,amplitude=.12){
   transformed.x+=sin(uWindTime*.7+wp.x*.19+wp.z*.17)*${amplitude.toFixed(3)}*w;
   transformed.z+=cos(uWindTime*.52+wp.z*.21)*${(amplitude*.55).toFixed(3)}*w;`);};m.customProgramCacheKey=()=>`plant-wind-${height}-${amplitude}`;return m;
 }
-function grassGeometry(){const random=rng(311),p=[],n=[],uv=[],idx=[];for(let b=0;b<17;b++){
+export function grassGeometry(){const random=rng(311),p=[],n=[],uv=[],idx=[];for(let b=0;b<17;b++){
   const a=random()*Math.PI*2,r=random()*.55,x=Math.cos(a)*r,z=Math.sin(a)*r,h=.5+random()*.8,w=.018+random()*.035,bend=.18+random()*.35;
   const base=p.length/3;for(let j=0;j<=4;j++){const t=j/4,xx=x+Math.cos(a)*bend*t*t,zz=z+Math.sin(a)*bend*t*t,ww=w*(1-t*.97);for(const sign of [-1,1]){p.push(xx+Math.sin(a)*ww*sign,h*t,zz-Math.cos(a)*ww*sign);n.push(Math.cos(a)*.4,.8,Math.sin(a)*.4);uv.push(sign<0?0:1,t);}}
   for(let j=0;j<4;j++){const i=base+j*2;idx.push(i,i+2,i+1,i+1,i+2,i+3);}
@@ -71,6 +72,7 @@ export function createVegetation(){
     if(i<3000){x=-1110+random()*1670;z=southShore(x)+12+random()*560;}
     else if(i<4700){x=-2150+random()*1100;z=-1150+random()*1600;}
     else{x=-4400+random()*8000;z=northShore(x)-20-random()*1400;}
+    if(Math.abs(x)>P.terrain.halfExtent-80||z-5000<-P.terrain.upstreamExtent+80)continue;
     const y=heightAt(x,z),density=noise(x*.008,z*.008),slope=surfaceNormal(x,z).y;
     if(y<3||y>830||slope<.56||density<.31||!allowed(x,z))continue;
     if(i<3000&&random()>.45)continue;

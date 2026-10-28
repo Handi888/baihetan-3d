@@ -12,8 +12,7 @@ try{
 await mkdir(dist,{recursive:true});await writeFile(marker,'Generated only by scripts/build-site.mjs\n');
 const files=['index.html','style.css','README.md','reservoir-landscape/index.html',
   'vendor/three.module.js','vendor/OrbitControls.js','vendor/THREE-LICENSE.txt',
-  ...['creature.mesh','color.jpg','roughness.jpg','metallic.jpg'].map(f=>'assets/creature/runtime/'+f),
-  ...['bank-detail-20261015.jpg','canyon-20261015.jpg','park.jpg','rock-bank.jpg','panorama.jpg'].map(f=>'references/'+f)];
+  ...['creature.mesh','color.jpg','roughness.jpg','metallic.jpg'].map(f=>'assets/creature/runtime/'+f)];
 async function walk(relative){for(const entry of await readdir(path.join(root,relative),{withFileTypes:true})){
   const file=relative+'/'+entry.name;if(entry.isSymbolicLink())throw new Error('Symlink not allowed: '+file);
   if(entry.isDirectory())await walk(file);else if(entry.name.endsWith('.js'))files.push(file);

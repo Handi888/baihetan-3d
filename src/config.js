@@ -21,7 +21,8 @@ export const PARAMS = {
     },
   },
   terrain: {
-    halfExtent: 6200, upstreamExtent: 12600, downstreamExtent: 4200,
+    // 收紧地图外圈，保留坝址、河道、公园和沿岸完整山脊；精细区步长不变。
+    halfExtent: 3900, upstreamExtent: 10000, downstreamExtent: 2200,
     nearStep: 4, farStep: 24, nearHalfWidth: 580, nearZMin: -850, nearZMax: 1050,
     benchRise: 24, benchFraction: 0.29,
   },
@@ -43,6 +44,7 @@ export const PARAMS = {
   quality: { low: {dpr: .8, shadow: 0}, medium: {dpr: 1, shadow: 1024}, high: {dpr: 1.5, shadow: 2048} },
 };
 export const PRESETS = {
+  engineering: {title:'电站工程全景',subtitle:'双曲拱坝 · 两岸高边坡 · 上游进水口与林覆山脊',eye:[-95,825,1430],target:[0,230,-65]},
   unified: {title:'坝库一体总览',subtitle:'同一模型 · 大坝、峡谷、库区与滨水公园',eye:[1600,5500,4100],target:[400,259,-2400]},
   reservoir: {title:'上游湖湾',subtitle:'连通坝前的蓝绿湖面 · 梯田 · 远山与村落',eye:[135,363,-4100],target:[-110,339,-6400]},
   park: {title:'滨水公园',subtitle:'库区岸线的一部分 · 白色廊架与乔灌草',eye:[-70,317,-4430],target:[-280,268,-4680]},

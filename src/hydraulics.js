@@ -7,21 +7,24 @@ import {member,hollowCylinder,tunnelMouth,railPath} from './detail-geometry.js';
 import {createGantry} from './gantry.js';
 import {smallBuilding} from './crest.js';
 import {portalSpecs} from './portals.js';
+import {intakeLayout} from './intake-layout.js';
 export function createHydraulics(m){
   const g=new THREE.Group();g.name='Intakes, hollow shafts, outlet basin and permanent operation plazas';const H=P.dam.height;
-  for(const spec of P.details.intakes){
+  for(const [bank,spec] of P.details.intakes.entries()){
     const {side,z,length}=spec,root=new THREE.Group();root.name=`${side} bank intake gallery`;g.add(root);
-    const level=P.water.upstream+24,front=[],back=[];
+    const {level}=intakeLayout(bank),front=[],back=[];
     for(let i=0;i<=48;i++){const zz=z-length/2+length*i/48,x=groundShoreline(zz,P.water.upstream,side)-side*10;front.push([x-side*12,level,zz]);back.push([x+side*9,level,zz]);}
     ribbon(root,front,5.5,m.concrete).name='Intake front operation deck';ribbon(root,back,5,m.concrete).name='Intake rear deck';
     for(let i=0;i<=8;i++){
       const zz=z-length/2+length*i/8,x=groundShoreline(zz,P.water.upstream,side)-side*10;
-      box(root,m.concrete,[27,34,3.5],[x,level-17,zz]).name='Intake gate pier';box(root,m.concrete,[28,2,4.3],[x,level-1,zz]).name='Intake transverse deck';
+      box(root,m.concrete,[27,52,3.5],[x,level-26,zz]).name='Intake gate pier';box(root,m.concrete,[28,2,4.3],[x,level-1,zz]).name='Intake transverse deck';
+      // 视频近景中的闸墩迎水鼻端为圆头，沿水面连续落到水下。
+      const nose=mesh(new THREE.CylinderGeometry(1.75,1.75,52,24),m.concrete,root);nose.position.set(x-side*13.5,level-26,zz);nose.name='Rounded intake pier nose';
       if(i<8){
         const mid=zz+length/16,edge=groundShoreline(mid,P.water.upstream,side)-side*23;
-        box(root,m.recess,[.5,27,length/8-4],[edge+side*2,level-16,mid]).name='Recessed intake opening';
-        for(let j=0;j<10;j++){const dz=-(length/8-5)/2+(length/8-5)*j/9;member(root,m.rail,[edge,level-30,mid+dz],[edge,level-3,mid+dz],.18,.18,'Separate intake trash-rack bar');}
-        for(const y of [level-25,level-15,level-5])box(root,m.rail,[.4,.3,length/8-4],[edge-side*.1,y,mid]).name='Rack transverse member';
+        box(root,m.recess,[.5,47,length/8-4],[edge+side*2,level-26,mid]).name='Recessed intake opening';
+        for(let j=0;j<10;j++){const dz=-(length/8-5)/2+(length/8-5)*j/9;member(root,m.rail,[edge,level-48,mid+dz],[edge,level-3,mid+dz],.18,.18,'Separate intake trash-rack bar');}
+        for(const y of [level-44,level-25,level-5])box(root,m.rail,[.4,.3,length/8-4],[edge-side*.1,y,mid]).name='Rack transverse member';
       }
     }
     railPath(root,m.rail,front.filter((_,i)=>i%4===0));
@@ -29,15 +32,35 @@ export function createHydraulics(m){
     // Both ends of the bank galleries carry a red travelling hoist in the references.
     for(const offset of [-.34,.34]){const zz=z+length*offset,x=groundShoreline(zz,P.water.upstream,side)-side*11.5;createGantry(root,m,[x,level,zz],Math.PI/2,.62,{depth:34});}
   }
-  for(const p of P.details.platforms){
-    box(g,m.concrete,[p.width,4,p.length],[p.x,p.y-2,p.z]).name='Permanent concrete construction / maintenance plaza';
+  for(const [bank,p] of P.details.platforms.entries()){
+    const spec=intakeLayout(bank),side=spec.side,level=p.y;
+    const root=new THREE.Group();root.name='Shore-keyed abutment operating terrace';g.add(root);
+    // 平台顺岸坡收进山体，前缘弯折，不再是独立悬在水边的大矩形板。
+    const front=[],back=[],z0=Math.min(p.z-p.length*.42,spec.z+spec.length/2-8),z1=p.z+p.length*.42;
+    for(let i=0;i<=36;i++){const z=z0+(z1-z0)*i/36,x=groundShoreline(z,level-2,side)-side*4;front.push([x,level,z]);back.push([x+side*(i<5?30:38),level,z]);}
+    const outline=[...front,...back.slice().reverse()],shape=new THREE.Shape();shape.moveTo(outline[0][0],-outline[0][2]);for(const p of outline.slice(1))shape.lineTo(p[0],-p[2]);shape.closePath();
+    // 三个方孔是有深度的检修井，嵌在靠山的条形构筑物里，并非黑方块贴图。
     for(let i=0;i<3;i++){
-      const z=p.z-30+i*30,side=Math.sign(p.x),root=new THREE.Group();root.position.set(p.x-side*12,p.y,z);g.add(root);root.name='Open auxiliary gate base';
-      for(const x of [-7,7])box(root,m.concrete,[1.5,3,15],[x,1.5,0]);for(const zz of [-7,7])box(root,m.concrete,[15,3,1.5],[0,1.5,zz]);box(root,m.gate,[12,.5,12],[0,.2,0]);
+      const z=p.z-29+i*29,x=groundShoreline(z,level-2,side)+side*15,w=10,d=14,hole=new THREE.Path();
+      hole.moveTo(x-w/2,-z-d/2);hole.lineTo(x+w/2,-z-d/2);hole.lineTo(x+w/2,-z+d/2);hole.lineTo(x-w/2,-z+d/2);hole.closePath();shape.holes.push(hole);
+      for(const dx of [-5.6,5.6])box(root,m.darkConcrete,[1.2,12,16],[x+dx,level-6,z]).name='Auxiliary shaft side lining';
+      for(const dz of [-7.6,7.6])box(root,m.darkConcrete,[12.4,12,1.2],[x,level-6,z+dz]).name='Auxiliary shaft end lining';
+      box(root,m.gate,[10,.5,14],[x,level-11.5,z]).name='Recessed auxiliary shaft gate';
+      railPath(root,m.rail,[[x-6.6,level,z-8.6],[x+6.6,level,z-8.6],[x+6.6,level,z+8.6],[x-6.6,level,z+8.6],[x-6.6,level,z-8.6]]);
     }
-    smallBuilding(g,m,[p.x+Math.sign(p.x)*25,p.y,p.z+p.length*.26],[21,7,14],'Platform control room');
-    // Perimeter barriers are individual precast units.
-    for(let z=p.z-p.length/2+5;z<p.z+p.length/2;z+=9)box(g,m.concrete,[.6,1.1,5],[p.x-Math.sign(p.x)*(p.width/2-1),p.y+.55,z]).name='Platform edge barrier';
+    const top=mesh(new THREE.ExtrudeGeometry(shape,{depth:3,bevelEnabled:false,curveSegments:1}),m.concrete,root);top.rotation.x=-Math.PI/2;top.position.y=level-3;top.name='Contoured operating deck with actual shaft openings';
+    const support=new MeshBuilder();
+    for(let i=0;i<front.length-1;i++){
+      const a=front[i],b=front[i+1],base=q=>[q[0],Math.min(level-8,groundHeight(q[0],q[2])-.8),q[2]];
+      support.quad(base(a),base(b),b,a,side<0);
+      if(i%4===0)box(root,m.concrete,[.65,1.05,4],[a[0]-side*.35,level+.525,a[2]]).name='Separate terrace parapet';
+    }
+    mesh(support.geometry(),m.darkConcrete,root).name='Rock-founded abutment terrace front';
+    const gallery=spec.station(spec.z+spec.length/2),first=front[0];
+    ribbon(root,[[gallery.x,spec.level,gallery.z],[gallery.x+side*5,level-1,gallery.z+9],[first[0]+side*6,level,first[2]+12]],7,m.concrete).name='Intake-to-abutment maintenance connection';
+    const end=front.at(-1),crest=damPoint(side*.99,H),connection=[];
+    for(let i=0;i<=24;i++){const t=i/24;connection.push([end[0]+side*6+(crest[0]-end[0]-side*6)*t,level+(H+1-level)*t,end[2]+(crest[2]-end[2])*t]);}
+    ribbon(root,connection,6,m.concrete).name='Connected dam-abutment access deck';
   }
   const s=P.details.shafts,sx=s.x,sy=s.level,foundationBottom=Math.min(...[-18,18].flatMap(dx=>[-17,17].map(dz=>groundHeight(sx+dx,s.z+dz))))-1;
   box(g,m.darkConcrete,[37,sy-foundationBottom,35],[sx,(sy+foundationBottom)/2,s.z]).name='Circular shaft support terrace';

@@ -19,7 +19,7 @@ export function rockTextures(){
       if(d<first){second=first;first=d;block=hh;}else if(d<second)second=d;
     }
     const fracture=Math.exp(-(Math.sqrt(second)-Math.sqrt(first))*60);
-    const strata=Math.pow(Math.max(0,Math.cos((v*6+u*2+warp*.45)*Math.PI*2)),28);
+    const strata=Math.exp(-Math.abs(noise(u+warp*.04,v,8)-.5)*52);
     const grain=hash(x+913,y)-.5,vein=fracture*.8+strata*.2;
     const h=Math.max(0,Math.min(1,.36+n*.35+(block-.5)*.18-vein*.18+grain*.035)),k=(y*size+x)*4;
     const tone=99+n*99+(block-.5)*32-vein*62+grain*15;

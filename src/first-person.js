@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {faceZ} from './math.js';
 import {createWalkWorld} from './walk-world.js';
 
-export function createFirstPerson({canvas,rig,roots,heightAt,onStart,onChange}){
+export function createFirstPerson({canvas,rig,roots,heightAt,bounds=null,onStart,onChange}){
   let active=false,selecting=false,selected=null,world=null,yaw=0,pitch=0,vy=0,grounded=false,locked=false,lastMouse=null,oldFov=43,leftHeld=false;
   const keys=new Set(),touchKeys=new Set(),euler=new THREE.Euler(0,0,0,'YXZ'),eye=1.7;
   const pressed=code=>keys.has(code)||touchKeys.has(code);
@@ -21,7 +21,8 @@ export function createFirstPerson({canvas,rig,roots,heightAt,onStart,onChange}){
   }
   function pick(point,water=false){
     if(!selecting)return false;
-    world??=createWalkWorld(roots,heightAt);
+    world??=createWalkWorld(roots,heightAt,bounds);
+    if(!world.contains(point.x,point.z))return false;
     const floor=water?point.y:world.floor(point.x,point.z,point.y+.48);
     // 用同一碰撞支持面验收起点，拒绝陡壁、无支撑位置和不足以容纳身体的窄缝。
     if(!Number.isFinite(floor)||Math.abs(floor-point.y)>1||world.blocked(point.x,point.z,floor))return false;

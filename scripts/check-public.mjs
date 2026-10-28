@@ -27,7 +27,6 @@ for(const name of files){
   if(name.endsWith('.jpg')){const data=await readFile(path.join(root,name));assert(!data.includes(Buffer.from('Exif\0\0')),'EXIF remains: '+name);}
 }
 for(const f of ['creature.mesh','color.jpg','roughness.jpg','metallic.jpg'])await reference('assets/creature/runtime/'+f);
-for(const f of ['bank-detail-20261015.jpg','canyon-20261015.jpg','park.jpg','rock-bank.jpg','panorama.jpg'])await reference('references/'+f);
 assert((await lstat(path.join(root,'assets/creature/runtime/creature.mesh'))).size>400000,'Model must be complete');
 assert(!files.includes('assets/creature/runtime/model-info.json'),'Local source path must not be published');
 console.log(JSON.stringify({passed:true,files:files.length,references:checked,basePath:base.pathname,privateFilesExcluded:true}));

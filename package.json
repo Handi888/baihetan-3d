@@ -12,7 +12,8 @@
     "check:public": "node scripts/check-public.mjs",
     "deploy": "node scripts/publish.mjs",
     "check:creatures": "node scripts/check-creatures.mjs",
-    "check:walking": "node scripts/check-walking.mjs"
+    "check:walking": "node scripts/check-walking.mjs",
+    "check:powerhouse": "node scripts/check-powerhouse.mjs"
   },
   "description": "Photo-referenced procedural Baihetan double-curvature arch dam. Local, offline-ready Three.js course exhibit.",
   "devDependencies": {

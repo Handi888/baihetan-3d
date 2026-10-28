@@ -1,6 +1,6 @@
 import { PARAMS as P } from './config.js';
 import {bankContourOffset} from './bank-layout.js';
-import {naturalHeight} from './reservoir/landscape.js';
+import {naturalHeight,noise as naturalNoise,fbm as naturalFbm} from './reservoir/landscape.js';
 export const clamp = (x,a,b) => Math.max(a,Math.min(b,x));
 export const mix = (a,b,t) => a+(b-a)*t;
 export const smooth = (a,b,x) => { const t=clamp((x-a)/(b-a),0,1); return t*t*(3-2*t); };
@@ -51,7 +51,9 @@ export function originalTerrainHeight(x,z) {
   // Actual rock relief outside the engineered faces: coherent ledges and fissures,
   // with zero perturbation at the dam joints or at building foundations.
   const natural=smooth(390,510,h)*(1-smooth(1500,2100,dist));
-  h+=natural*(7*Math.sin(x*.11+z*.047)+4*Math.sin(x*.23-z*.13)+2.5*Math.sin(x*.49+z*.29));
+  // 山脊轮廓与局部风化分开：移除高频正弦起伏，避免相同凸点排列成“鞋垫”。
+  const warpX=x+120*(naturalNoise(x*.0017,z*.0017)-.5),warpZ=z+90*(naturalNoise(x*.0021+30,z*.0021)-.5);
+  h+=natural*((naturalFbm(warpX*.008,warpZ*.008)-.5)*38+(naturalNoise(warpX*.035,warpZ*.027)-.5)*4);
   // Monotone stepped excavation profile: a steep riser followed by a real flat berm.
   // Kept before small building benches so those foundations remain horizontal.
   const rise=P.terrain.benchRise,cell=Math.floor(h/rise),fraction=h/rise-cell;
@@ -62,7 +64,7 @@ export function originalTerrainHeight(x,z) {
   // 支护之间保留细碎裸岩起伏。幅度远小于坡面梯度，岸线仍以同一
   // 三角网格求交；墙身采用独立设计放样，不随这层风化纹理抖动。
   const cutRelief=excavation*smooth(75,125,h)*(1-smooth(395,445,h));
-  h+=cutRelief*(.65*Math.sin(x*.38+z*.26)+.38*Math.sin(x*.77-z*.43));
+  h+=cutRelief*(naturalNoise(x*.083+13,z*.071)-.5)*.85;
   // Small engineered benches support the visible bank buildings; no floating slabs.
   const bx=flank*(topWidth+48);
   const bench=(1-smooth(31,59,Math.abs(x-bx)))*(1-smooth(23,47,Math.abs(z+12)));

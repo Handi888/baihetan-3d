@@ -20,6 +20,7 @@ jobs:
       - run: npm ci
       - run: node scripts/check-walking.mjs
       - run: node scripts/check-creatures.mjs
+      - run: node scripts/check-powerhouse.mjs
       - run: node scripts/build-site.mjs
       - run: node scripts/check-public.mjs
       - uses: actions/configure-pages@v5

@@ -10,10 +10,11 @@ import {retainingWallSpecs} from './bank-layout.js';
 import {bankEnvelopeX} from './bank-surface.js';
 import {createRetainingWalls,createShoreRocks} from './retaining-walls.js';
 import {instanceRepeatedDetails} from './render-optimization.js';
+import {createCanyonForest} from './canyon-forest.js';
 export function createTerrain(m){
   const group=new THREE.Group();group.name='Rock canyon with excavated benches';
   const rock=mesh(excavatedGroundGeometry(),m.rock,group);rock.name='Shared high resolution terrain surface';
-  const walls=createRetainingWalls(m),shoreRocks=createShoreRocks(m);group.add(walls,shoreRocks);
+  const walls=createRetainingWalls(m),shoreRocks=createShoreRocks(m);group.add(walls,shoreRocks,createCanyonForest());
   let terraces=0,anchors=0,galleries=0,stairTreads=0,inclinedTendons=0;
   for(const side of [-1,1]){
     // Each bench is a solid strip with a top, riser and underside, not a painted line.

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 // 只为可行走构筑物建立空间索引；天然地形直接复用原三角地形取样。
 // 不在每帧遍历山体、水面或植被的数百万个三角形。
-export function createWalkWorld(roots,heightAt){
+export function createWalkWorld(roots,heightAt,bounds=null){
   const cells=new Map(),size=32,a=new THREE.Vector3(),b=a.clone(),c=a.clone();
   const key=(x,z)=>`${Math.floor(x/size)},${Math.floor(z/size)}`;
   for(const root of roots)root.traverse(o=>{
@@ -25,7 +25,11 @@ export function createWalkWorld(roots,heightAt){
     }
   });
   const ray=new THREE.Ray(),hit=new THREE.Vector3(),point=new THREE.Vector3(),closest=new THREE.Vector3();
+  // groundHeight 对网格外的采样会夹到边缘，不能把这个值当成虚空中的地板。
+  // 未传 bounds 的调用保持旧行为，便于使用独立构件和碰撞测试场景。
+  function contains(x,z){return Number.isFinite(x)&&Number.isFinite(z)&&(!bounds||x>=bounds.minX&&x<=bounds.maxX&&z>=bounds.minZ&&z<=bounds.maxZ);}
   function floor(x,z,ceiling=Infinity){
+    if(!contains(x,z))return -Infinity;
     let y=heightAt(x,z);if(y>ceiling)y=-Infinity;
     ray.origin.set(x,Number.isFinite(ceiling)?ceiling:4000,z);ray.direction.set(0,-1,0);
     for(const t of cells.get(key(x,z))||[]){if(t.normal.y<.35||t.minY>ceiling||t.maxY<y)continue;
@@ -33,11 +37,12 @@ export function createWalkWorld(roots,heightAt){
     }return y;
   }
   function blocked(x,z,feet){
+    if(!contains(x,z))return true;
     if(heightAt(x,z)>feet+.48)return true;
     const candidates=new Set();for(const dx of [-.36,.36])for(const dz of [-.36,.36])for(const t of cells.get(key(x+dx,z+dz))||[])candidates.add(t);
     for(const t of candidates){if(Math.abs(t.normal.y)>.8||t.maxY<feet+.48||t.minY>feet+1.75)continue;
       for(const h of [.55,1.05,1.55]){point.set(x,feet+h,z);t.tri.closestPointToPoint(point,closest);if(point.distanceToSquared(closest)<.36**2)return true;}
     }return false;
   }
-  return {floor,blocked,cellCount:cells.size};
+  return {floor,blocked,contains,cellCount:cells.size};
 }
