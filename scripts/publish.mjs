@@ -22,7 +22,7 @@ function run(command,args,options={}){
   return result.stdout.trim();
 }
 try{
-  for(const script of ['check-walking.mjs','check-creatures.mjs','check-powerhouse.mjs','build-site.mjs','check-public.mjs'])console.log(run(process.execPath,['scripts/'+script]));
+  for(const script of ['check-walking.mjs','check-creatures.mjs','check-powerhouse.mjs','check-unified.mjs','build-site.mjs','check-public.mjs'])console.log(run(process.execPath,['scripts/'+script]));
   if(!existsSync(path.join(root,'.git')))run('git',['init','-b','main']);
   if(run('git',['branch','--show-current'])!=='main')throw new Error('请先切回 main 分支，再发布。');
   run('git',['add','--all']);

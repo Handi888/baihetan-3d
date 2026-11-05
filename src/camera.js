@@ -3,8 +3,9 @@ import {OrbitControls} from '../vendor/OrbitControls.js';
 import {PARAMS as P,PRESETS} from './config.js';
 import {terrainHeight,faceZ,section} from './math.js';
 import {groundHeight} from './ground-surface.js';
+import {withinMap} from './map-domain.js';
 export function safeAltitude(x,z){
-  let h=Math.max(terrainHeight(x,z),groundHeight(x,z));
+  let h=withinMap(x,z,0)?groundHeight(x,z):0;
   if(z<faceZ(x,P.water.upstream,1))h=Math.max(h,P.water.upstream);
   else h=Math.max(h,P.water.downstream);
   const s=section(P.dam.height);

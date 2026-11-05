@@ -1,6 +1,6 @@
 // 精简入口；漫游与地下机组各自处理键盘，避免教学/行走时误切场景。
 export function installInteractions(api){
-  const $=s=>document.querySelector(s),views=['engineering','upstream','park','overhead'];
+  const $=s=>document.querySelector(s),views=['engineering','upstream','park','unified'];
   function closePanel(){document.body.classList.remove('panel-open');$('#panel-toggle').textContent='控制 ☰';}
   document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{api.setView(b.dataset.view);closePanel();});
   $('#panel-toggle').onclick=()=>{$('#panel-toggle').textContent=document.body.classList.toggle('panel-open')?'关闭 ✕':'控制 ☰';};

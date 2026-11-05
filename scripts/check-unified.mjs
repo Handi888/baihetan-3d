@@ -15,6 +15,7 @@ import {createBuildings} from './src/buildings.js';
 import {createWater} from './src/water.js';
 import {createReservoirDistrict} from './src/reservoir-district.js';
 import {groundHeight,groundData} from './src/ground-surface.js';
+import {mapLimits,withinMap} from './src/map-domain.js';
 import {originalTerrainHeight,terrainHeight,reservoirChannelX,makeOpenings,damPoint} from './src/math.js';
 import {retainingWallSpecs} from './src/bank-layout.js';
 import {PARAMS as P,PRESETS} from './src/config.js';
@@ -45,15 +46,28 @@ for(const group of [dam,buildings])group.traverse(o=>assert(!o.isInstancedMesh,'
 assert.equal(retainingWallSpecs().length,40);report.retaining=terrain.userData.retaining;
 assert.equal(terrain.userData.realPortalCuts,26);
 for(let z=-850;z<=1050;z+=31)for(let x=-580;x<=580;x+=37)assert.equal(terrainHeight(x,z),originalTerrainHeight(x,z));
+for(const row of groundData().rows)for(const id of row){const a=id*3,d=groundData(),x=d.positions[a],z=d.positions[a+2];if(Math.abs(x)<=580&&z>=-850&&z<=1050)assert.equal(d.positions[a+1],Math.fround(originalTerrainHeight(x,z)),'No changes to actual engineered terrain vertices');}
 report.checks.push('Original dam, 40 retaining courses and 26 bank openings preserved; engineered terrain unchanged');
-for(const mesh of water.surfaces){const g=mesh.geometry,d=g.userData;assert.equal(g.index.count/3,2*(d.columns-1)*(d.rows-1));assert.equal(d.removedTriangles,0);assert.equal(d.shoreClipping,false);const actual=mesh.tiles.children.flatMap(t=>Array.from(t.geometry.index.array));
+for(const mesh of water.surfaces){const g=mesh.geometry,d=g.userData;assert.equal(g.index.count/3,d.rowLengths.slice(1).reduce((sum,n,i)=>sum+n+d.rowLengths[i]-2,0));assert.equal(d.removedTriangles,0);assert.equal(d.shoreClipping,false);const actual=mesh.tiles.children.flatMap(t=>Array.from(t.geometry.index.array));
 assert.equal(actual.length,g.index.count,'All water indices survive tiling');
 // Compare complete ordered triples including duplicates; no missing or invented edge faces.
 const triples=indices=>{const a=[];for(let i=0;i<indices.length;i+=3)a.push(indices[i]+','+indices[i+1]+','+indices[i+2]);return a.sort();};
 assert.deepEqual(triples(actual),triples(g.index.array));
-report.water.push({...d,tiles:mesh.tiles.children.length,vertices:g.attributes.position.count});}
+// 每个完整条带是一个连通圆盘：共享边只能出现两次；外边界之外没有内部孔洞。
+const edgeUses=new Map();for(let i=0;i<g.index.count;i+=3)for(const [a,b] of [[0,1],[1,2],[2,0]]){const x=g.index.getX(i+a),y=g.index.getX(i+b),key=Math.min(x,y)+','+Math.max(x,y);edgeUses.set(key,(edgeUses.get(key)||0)+1);}
+for(const count of edgeUses.values())assert(count<=2,'Water edge must be manifold');
+assert.equal(g.attributes.position.count-edgeUses.size+g.index.count/3,1,'Water strip must be a disk without holes');
+const {rowLengths,...meta}=d;report.water.push({...meta,tiles:mesh.tiles.children.length,vertices:g.attributes.position.count});}
 assert.equal(water.group.children.length,2);assert.equal(district.group.getObjectsByProperty('name','Reservoir').length,0);
 report.checks.push('Exactly one upstream sheet and one downstream sheet; no extra water at the district; no shoreline triangle deletion');
+report.mapAreaKm2=+(groundData().area/1e6).toFixed(2);report.previousMapAreaKm2=95.16;
+assert(report.mapAreaKm2<38,'The broad duplicate mountain areas must actually be removed');
+for(const z of [-1000,-500,0,500,1000])assert(withinMap(-1000,z)&&withinMap(1000,z),'Keep engineering coverage');
+assert(!withinMap(3000,0),'Old east mountain must be outside the new map');
+assert(!withinMap(-3000,1000),'Old west mountain must be outside the new map');
+// 沿整个水道逐点检查水面包含湿区：收窄的是山脊外边界，不是岸线。
+for(let z=-7800;z<1700;z+=32){const limits=mapLimits(z,320);if(!limits)continue;for(let x=-3800;x<=3800;x+=32)if(terrainHeight(x,z)<(z<-200?259:24)-1)assert(x>limits.min+24&&x<limits.max-24,'Wet shore cannot approach outer water edge');}
+report.checks.push('Compact river footprint; all wet shores remain inside the complete water sheets; outer ridges physically removed');
 for(let z=-1800;z>=-5050;z-=25){const x=reservoirChannelX(z),y=groundHeight(x,z);assert(y<P.water.upstream-15,'The connecting channel must stay submerged');report.channel.push({x,z,depth:P.water.upstream-y});}
 assert.equal(district.group.position.y,P.water.upstream);assert.equal(district.group.position.z,-5000);
 report.checks.push('Continuous submerged connection from canyon to lake; district uses upstream water datum');

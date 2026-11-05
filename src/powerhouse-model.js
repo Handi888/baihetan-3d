@@ -66,6 +66,8 @@ function runnerBlade(){
 export function createPowerhouseModel(){
   const root=new THREE.Group();root.name='两岸地下引水发电系统 · 教学剖视';
   const m={steel:material(0xa7bfcb,.83,.26),dark:material(0x293b48,.65,.32),blue:material(0x477e98,.5,.35),concrete:material(0xb5bec1,.02,.85),floor:material(0xa8c0c7,.12,.38),white:material(0xe8ece7,.1,.52),copper:material(0xdca25a,.8,.26),red:material(0xbe514b,.45,.4),navy:material(0x286e9f,.5,.35),yellow:material(0xf3b445,.3,.4),black:material(0x142d38,.3,.45)};
+  m.floor=new THREE.MeshPhysicalMaterial({color:0xb8c6c9,roughness:.28,metalness:.08,clearcoat:.3,clearcoatRoughness:.22});
+  m.blue.color.set(0x5099bb);
   m.glow=new THREE.MeshStandardMaterial({color:0xe8f7ff,emissive:0xcceaff,emissiveIntensity:2.2});
   m.water=new THREE.MeshStandardMaterial({color:0x45d9eb,metalness:.15,roughness:.25,transparent:true,opacity:.18,depthWrite:false,side:THREE.DoubleSide});
   m.pipe=new THREE.MeshStandardMaterial({color:0x68adc3,metalness:.6,roughness:.3,transparent:true,opacity:.24,depthWrite:false,side:THREE.DoubleSide});
@@ -123,7 +125,7 @@ export function createPowerhouseModel(){
     for(const x of [-19,19]){
       box(hall,m.white,[1.4,36,416],[x,46,0],'厂房纵墙');box(hall,m.dark,[1.6,1,416],[x-.8*Math.sign(x),57,0],'桥机轨道梁');
       const seams=[],lamps=[],vents=[];
-      for(let z=-202;z<=202;z+=6){seams.push({p:[x-Math.sign(x)*.72,45,z],s:[.022,33,.028]});if(z%12===-10)lamps.push({p:[x-Math.sign(x)*.8,45,z],s:[.16,15,.16]});}
+      for(let z=-202;z<=202;z+=6){seams.push({p:[x-Math.sign(x)*.72,45,z],s:[.022,33,.028]});if((z+202)%12===0)lamps.push({p:[x-Math.sign(x)*.8,45,z],s:[.16,15,.16]});}
       for(let y=30;y<64;y+=3)seams.push({p:[x-Math.sign(x)*.74,y,0],s:[.02,.025,416]});
       for(let z=-198;z<200;z+=1.8)vents.push({p:[x-Math.sign(x)*.85,30.3,z],s:[.1,2.3,.8]});
       instance(hall,new THREE.BoxGeometry(1,1,1),m.concrete,seams,'墙面方格分缝');instance(hall,new THREE.BoxGeometry(1,1,1),m.glow,lamps,'纵墙灯带');instance(hall,new THREE.BoxGeometry(1,1,1),m.dark,vents,'通风格栅');
@@ -137,14 +139,25 @@ export function createPowerhouseModel(){
     // 拱顶肋架 + 排列灯具，不用几十盏实时点光源拖慢画面。
     for(let z=-204;z<=204;z+=24){const pts=[];for(let i=0;i<=24;i++){const a=Math.PI*i/24;pts.push([19*Math.cos(a),64+9*Math.sin(a),z]);}pipe(hall,m.dark,pts,.3,'拱顶钢肋',24);}
     const roofP=[],roofI=[];for(let j=0;j<=48;j++){const a=Math.PI*j/48;for(const z of [-208,208])roofP.push(19.3*Math.cos(a),64.3+9.2*Math.sin(a),z);if(j<48){const n=j*2;roofI.push(n,n+1,n+2,n+1,n+3,n+2);}}
-    const roofG=new THREE.BufferGeometry();roofG.setAttribute('position',new THREE.Float32BufferAttribute(roofP,3));roofG.setIndex(roofI);roofG.computeVertexNormals();const roofM=material(0x687985,.2,.72);roofM.side=THREE.DoubleSide;mesh(hall,roofG,roofM,'完整拱顶衬砌');
+    const roofG=new THREE.BufferGeometry();roofG.setAttribute('position',new THREE.Float32BufferAttribute(roofP,3));roofG.setIndex(roofI);roofG.computeVertexNormals();const roofM=material(0x8b9695,.15,.72);roofM.side=THREE.DoubleSide;mesh(hall,roofG,roofM,'完整拱顶衬砌');
     const lamps=[];for(const x of [-12,0,12])for(let z=-192;z<=192;z+=12)lamps.push({p:[x,66, z],s:[.75,.15,.75]});instance(hall,new THREE.SphereGeometry(1,12,6),m.glow,lamps,'三排顶灯');
-    box(hall,m.white,[38,40,1],[0,48,208],'厂房端墙');
+    for(const z of [-208,208]){
+      box(hall,m.white,[38,36,1.4],[0,46,z],'厂房端墙');
+      const cap=new THREE.Shape();cap.moveTo(19,64);cap.absellipse(0,64,19,9,0,Math.PI,false);cap.closePath();
+      mesh(hall,new THREE.ExtrudeGeometry(cap,{depth:1.4,bevelEnabled:false,curveSegments:48}),roofM,'封闭端部拱顶',[0,0,z-.7]);
+      box(hall,m.dark,[6.6,9,.15],[0,32.5,z-Math.sign(z)*.8],'端墙检修门');
+      for(const x of [-3.6,3.6])box(hall,m.concrete,[.4,9.7,.5],[x,32.8,z-Math.sign(z)],'端墙门框');
+    }
     // 橙色桥式起重机：两根主梁、端梁、小车、护栏、钢索、吊钩。
     const crane=group(hall,'双梁桥式起重机');crane.position.set(0,57,130);
     for(const z of [-3,3]){box(crane,m.yellow,[36,2.4,1.5],[0,0,z],'桥机主梁');rod(crane,m.dark,[-17,2,z],[17,2,z],.06);for(let x=-16;x<=16;x+=4)rod(crane,m.dark,[x,1,z],[x,2,z],.06);}
     for(const x of [-17,17])box(crane,m.yellow,[2.2,2.4,9],[x,0,0],'端梁');
+    const stiffeners=[];for(const z of [-3.8,3.8])for(let x=-15;x<=15;x+=3)stiffeners.push({p:[x,0,z],s:[.13,2.3,.14]});
+    instance(crane,new THREE.BoxGeometry(1,1,1),m.yellow,stiffeners,'桥机腹板加劲肋');
+    box(crane,m.yellow,[2.7,3.4,3.6],[-14,-2.8,0],'桥机司机室');
+    box(crane,m.navy,[2.3,1.5,.06],[-14,-2.3,1.84],'司机室观察窗');
     box(crane,m.red,[5,2,6],[-5,2,0],'起升小车');
+    cylinder(crane,m.dark,.7,3.4,[-5,3.5,0],.7,'起升卷筒').rotation.z=Math.PI/2;
     for(const x of [-5.5,-4.5])rod(crane,m.dark,[x,0,0],[x,-10,0],.045,'起重钢索');
     const hook=mesh(crane,new THREE.TorusGeometry(.6,.15,12,30,Math.PI*1.5),m.steel,'吊钩',[-5,-10.7,0]);hook.rotation.z=Math.PI/2;
   }

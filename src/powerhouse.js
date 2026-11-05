@@ -15,7 +15,7 @@ export function installPowerhouse({scene,renderer,rig,canvas,dam,terrain,beforeE
   const ui=document.createElement('section');ui.id='powerhouse-ui';ui.hidden=true;
   ui.setAttribute('aria-label','地下电站发电原理讲解');
   ui.innerHTML=`
-    <header class="ph-heading"><h1>电站内部</h1><p id="ph-location">坝库整体 › 两岸山体 › 地下厂房 › 机组</p></header>
+    <header class="ph-heading"><h1>电站内部</h1><p id="ph-location">左岸厂房 · 01 号机组</p></header>
     <button id="ph-exit" class="ph-exit">返回场景 <span>Esc ↗</span></button>
     <nav class="ph-views" aria-label="电站内部视角"><button data-ph-view="system" aria-pressed="true">整体透视</button><button data-ph-view="hall" aria-pressed="false">进入厂房</button><button data-ph-view="unit" aria-pressed="false">机组剖视</button></nav>
     <aside class="ph-panel">
@@ -23,7 +23,7 @@ export function installPowerhouse({scene,renderer,rig,canvas,dam,terrain,beforeE
       <div class="ph-panel-content">
         <h2 id="ph-title">一台机组，三种能量</h2>
         <div class="ph-steps" aria-label="发电原理分步讲解">${STEPS.map((s,i)=>`<button data-ph-step="${i}" title="${s.tag}" aria-label="${s.tag}">${String(i+1).padStart(2,'0')}</button>`).join('')}</div>
-        <div class="ph-step-nav"><button id="ph-prev">← 上一步</button><button id="ph-overview">完整机组</button><button id="ph-next">下一步 →</button></div>
+        <div class="ph-step-nav"><button id="ph-overview">完整机组</button></div>
         <div class="ph-rule"></div>
         <div class="ph-select-row"><label>厂房<select id="ph-bank"><option value="0">左岸厂房</option><option value="1">右岸厂房</option></select></label><label>机组<select id="ph-unit">${Array.from({length:8},(_,i)=>`<option value="${i}">${String(i+1).padStart(2,'0')} 号机组</option>`).join('')}</select></label></div>
         <label class="ph-range">山体不透明度 <output id="ph-rock-value">15%</output><input id="ph-rock" type="range" min="5" max="100" value="15" step="1"></label>
@@ -42,7 +42,7 @@ export function installPowerhouse({scene,renderer,rig,canvas,dam,terrain,beforeE
       </div>
     </aside>
     <div id="ph-labels-layer" aria-hidden="true"></div>
-    <div class="ph-bottom"><div class="ph-legend"><span class="water">水流</span><span class="mechanical">机械传动</span><span class="electric">电能输出</span></div><span id="ph-model-status">同轴传动 / 定子静止</span><small>拖动旋转 · 滚轮缩放 · 双指平移</small></div>`;
+    <div class="ph-bottom"><div class="ph-legend"><span class="water">水流</span><span class="mechanical">机械传动</span><span class="electric">电能输出</span></div></div>`;
   document.body.append(ui);
   const labelLayer=$('#ph-labels-layer');
   const labels=PARTS.map(([key,text,type],i)=>{
@@ -79,24 +79,21 @@ export function installPowerhouse({scene,renderer,rig,canvas,dam,terrain,beforeE
     mode=value;model.setMode(mode);
     if(saved){for(const [o,visible] of saved.objects)if(o.isLight)o.visible=mode==='system'&&visible;scene.fog=mode==='system'?saved.fog:null;}
     lightGroup.visible=mode!=='system';
-    $('#ph-location').textContent=`坝库整体 › ${bank===0?'左岸':'右岸'}山体 › 地下厂房 › ${String(bank*8+unit+1).padStart(2,'0')} 号机组`;
+    $('#ph-location').textContent=`${bank===0?'左岸':'右岸'}厂房 · ${String(bank*8+unit+1).padStart(2,'0')} 号机组`;
     $('#ph-unit-controls').hidden=mode!=='unit';labelLayer.hidden=mode!=='unit';
     document.querySelectorAll('[data-ph-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.phView===mode)));
     if(mode==='hall'){
-      $('#ph-tag').textContent='UNDERGROUND / 地下厂房';$('#ph-title').textContent=`${bank===0?'左岸':'右岸'} · 八台机组排列`;
+      $('#ph-tag').textContent='地下厂房';$('#ph-title').textContent=`${bank===0?'左岸':'右岸'} · 八台机组`;
       
-      $('#ph-model-status').textContent='发电机层 / 桥式起重机 / 检修廊道';
     }else if(mode==='system'){
-      $('#ph-tag').textContent='WATERWAY / 地下引水系统';$('#ph-title').textContent='山体内部，两岸发电';
+      $('#ph-tag').textContent='两岸电站';$('#ph-title').textContent='地下引水系统';
       
-      $('#ph-model-status').textContent='山体 → 厂房 → 机组 / 同一装配与世界坐标';
     }else setStepText();
     cameraView();syncAudit();
   }
   function setStepText(){
     const s=STEPS[step];$('#ph-tag').textContent=s?s.tag:'STRUCTURE / 结构观察';$('#ph-title').textContent=s?s.title:'一台机组，三种能量';
     
-    $('#ph-model-status').textContent=exploded?'装配分解 / 非运行状态':'同轴传动 / 定子静止';
     document.querySelectorAll('[data-ph-step]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.phStep)===step)));
   }
   function setStep(value){step=value;setMode('unit');}
@@ -132,7 +129,7 @@ export function installPowerhouse({scene,renderer,rig,canvas,dam,terrain,beforeE
   $('#powerhouse-button').onclick=()=>enter();$('#ph-exit').onclick=exit;
   document.querySelectorAll('[data-ph-view]').forEach(b=>b.onclick=()=>setMode(b.dataset.phView));
   document.querySelectorAll('[data-ph-step]').forEach(b=>b.onclick=()=>setStep(Number(b.dataset.phStep)));
-  $('#ph-next').onclick=()=>setStep((step+1)%STEPS.length);$('#ph-prev').onclick=()=>setStep((step+STEPS.length-1)%STEPS.length);$('#ph-overview').onclick=()=>setStep(-1);
+  $('#ph-overview').onclick=()=>setStep(-1);
   $('#ph-bank').onchange=choose;$('#ph-unit').onchange=choose;
   $('#ph-cut').onchange=e=>{model.configure({cut:e.target.checked});syncAudit();};
   $('#ph-explode').onchange=e=>{exploded=e.target.checked;step=-1;model.configure({explosion:exploded?1:0});setMode('unit');};
@@ -148,7 +145,7 @@ export function installPowerhouse({scene,renderer,rig,canvas,dam,terrain,beforeE
     if(e.code==='Escape'){e.preventDefault();e.stopImmediatePropagation();exit();return;}
     if(e.target.matches('input,select,button'))return;
     if(e.code==='Space'){e.preventDefault();$('#ph-pause').click();}
-    if(e.code==='ArrowRight')$('#ph-next').click();if(e.code==='ArrowLeft')$('#ph-prev').click();
+    if(e.code==='ArrowRight')setStep((step+1)%STEPS.length);if(e.code==='ArrowLeft')setStep((step+STEPS.length-1)%STEPS.length);
     e.stopImmediatePropagation();
   },true);
   window.addEventListener('resize',resize);

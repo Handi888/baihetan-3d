@@ -3,23 +3,30 @@ import * as THREE from 'three';
 import {PARAMS as P} from './config.js';
 import {faceZ} from './math.js';
 import {groundData,groundHeight} from './ground-surface.js';
+import {mapLimits,connectRows} from './map-domain.js';
 export function waterGeometry(upstream){
   const level=upstream?P.water.upstream:P.water.downstream;
   const data=groundData(),xs=data.xs;
   const rows=upstream?[...data.zs.filter(z=>z<=-220),null]:[null,...data.zs.filter(z=>z>=100)];
-  const n=xs.length*rows.length,positions=new Float32Array(n*3),normals=new Float32Array(n*3),depths=new Float32Array(n),indices=new Uint32Array((xs.length-1)*(rows.length-1)*6);
-  let k=0;
+  const positions=[],normals=[],depths=[],indices=[],stripRows=[];
   // 完整索引网格延伸到岩岸、挡墙和植物下方。岸线由深度测试自然遮挡，
   // 不按水深删三角形，不对岸线做裁切，也不在着色器中 discard。
-  // 唯一外边界是坝体实际分水面：两侧保留各自的水位，不能把两水位接成斜坡。
-  for(let j=0;j<rows.length;j++)for(let i=0;i<xs.length;i++){
-    const x=xs[i],z=rows[j]??faceZ(x,level,upstream?1:-1),a=j*xs.length+i;
-    positions.set([x,level,z],a*3);normals[a*3+1]=1;depths[a]=Math.max(0,level-groundHeight(x,z));
-    if(i<xs.length-1&&j<rows.length-1){const b=a+1,c=a+xs.length,d=c+1;indices.set([a,c,b,b,c,d],k);k+=6;}
+  // 水平外边界藏在山脊下，距真正岸线数百米；坝端仍用实际曲面分水。
+  // 固定步长和岸线原始列完整保留，只缩短远离水岸的地图外圈。
+  const firstLandZ=data.zs.find(z=>mapLimits(z));
+  for(const rowZ of rows){
+    if(rowZ!==null&&rowZ<firstLandZ+320)continue;
+    const bounds=mapLimits(rowZ??-40,320);if(!bounds)continue;
+    const row=[];
+    for(const x of xs){if(x<bounds.min||x>bounds.max)continue;
+      const z=rowZ??faceZ(x,level,upstream?1:-1),id=positions.length/3;
+      row.push(id);positions.push(x,level,z);normals.push(0,1,0);depths.push(Math.max(0,level-groundHeight(x,z)));
+    }
+    if(row.length>1){if(stripRows.length)connectRows(stripRows.at(-1),row,id=>positions[id*3],indices);stripRows.push(row);}
   }
-  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(positions,3));g.setAttribute('normal',new THREE.BufferAttribute(normals,3));
-  g.setAttribute('waterDepth',new THREE.BufferAttribute(depths,1));g.setIndex(new THREE.BufferAttribute(indices,1));g.computeBoundingSphere();
-  g.userData={columns:xs.length,rows:rows.length,completeTriangles:indices.length/3,removedTriangles:0,shoreClipping:false,level,method:'complete indexed sheet beneath banks; curved dam perimeter; depth occlusion only'};return g;
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(normals,3));
+  g.setAttribute('waterDepth',new THREE.Float32BufferAttribute(depths,1));g.setIndex(indices);g.computeBoundingSphere();
+  g.userData={columns:Math.max(...stripRows.map(r=>r.length)),rows:stripRows.length,rowLengths:stripRows.map(r=>r.length),completeTriangles:indices.length/3,removedTriangles:0,shoreClipping:false,level,method:'complete variable-width indexed strips beneath retained ridges; no shoreline clipping'};return g;
 }
 function waterMaterial(upstream){
   const a=P.water.appearance;

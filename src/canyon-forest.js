@@ -2,23 +2,28 @@ import * as THREE from 'three';
 import {groundHeight,groundShoreline} from './ground-surface.js';
 import {foliageGeometry,sprigTexture,grassGeometry} from './reservoir/vegetation.js';
 import {rng,noise} from './reservoir/landscape.js';
+import {withinMap} from './map-domain.js';
+import {reservoirChannelX} from './math.js';
 
 /** 视频中的植被覆山位于工程开挖区外。树根贴合同一三角网格，避开所有
  * 432 m 以下支护、山间公路及平台；原有墙层、道路和水面完全保留。 */
 export function createCanyonForest(){
   const group=new THREE.Group();group.name='Canyon natural ridge forest';
-  const random=rng(20261027),cells=new Map(),palette=[0x426339,0x3d5d35,0x577044,0x335633,0x637a4c];
+  const random=rng(20261027),cells=new Map(),palette=[0x95ad76,0x86a069,0xa4b982,0x77945f,0xb4c58c];
   const roads=[];for(const side of [-1,1])for(let i=0;i<=280;i++){const t=i/280,z=80-570*Math.cos(t*Math.PI*3),y=343+t*170;roads.push([groundShoreline(z,y,side),z]);}
-  for(let i=0;i<13000;i++){
-    const side=i%2?-1:1,z=-1600+random()*3600,edge=groundShoreline(z,438,side),x=edge+side*(28+random()*650),y=groundHeight(x,z);
-    if(y<460||noise(x*.009,z*.009)<.35||random()>.8)continue;
+  for(let i=0;i<36000;i++){
+    const side=i%2?-1:1,z=-3500+random()*5200,engineered=z>-1050&&z<1100,base=engineered?438:(z<0?275:48);
+    const edge=groundShoreline(z,base,side,z<-1800?reservoirChannelX(z):undefined),x=edge+side*(18+random()*520),y=groundHeight(x,z);
+    if(!withinMap(x,z,160)||y<(engineered?438:base+3)||noise(x*.009,z*.009)<.30||random()>.84)continue;
     // 保留岩脊、沟槽与不规则林窗，避免匀距的人工林效果。
     const slope=Math.hypot(groundHeight(x+3,z)-groundHeight(x-3,z),groundHeight(x,z+3)-groundHeight(x,z-3))/6;
     if(slope>2.5||roads.some(p=>Math.abs(z-p[1])<12&&Math.hypot(x-p[0],z-p[1])<11))continue;
     const cell=Math.floor(x/440)+','+Math.floor(z/440);if(!cells.has(cell))cells.set(cell,[]);
     cells.get(cell).push({x,y:y-.2,z,scale:.7+random()*1.1,stretch:.75+random()*.5,angle:random()*Math.PI*2,color:palette[Math.floor(random()*palette.length)]});
   }
-  const crown=foliageGeometry(733,10,4.5,74,2.2),trunk=new THREE.CylinderGeometry(.07,.23,7,6,1);
+  // 宽阔交叠的阔叶冠层接近参考中的连续山林；复用同样的 74 簇叶片，
+  // 不靠增加树数或三角形数量填满画面，仍保留不规则林窗与裸岩沟槽。
+  const crown=foliageGeometry(733,14.5,8.5,74,4.2),trunk=new THREE.CylinderGeometry(.07,.23,7,6,1);
   trunk.translate(0,3.5,0);
   const leaf=new THREE.MeshStandardMaterial({map:sprigTexture(),color:0xffffff,alphaTest:.38,alphaToCoverage:true,side:THREE.DoubleSide,roughness:.96});
   const bark=new THREE.MeshStandardMaterial({color:0x4f4a35,roughness:1});const dummy=new THREE.Object3D();let count=0;
@@ -35,7 +40,7 @@ export function createCanyonForest(){
   for(let i=0;i<5200;i++){
     const side=i%2?-1:1,z=-1150+random()*2700,x=groundShoreline(z,452,side)+side*(12+random()*420),y=groundHeight(x,z);
     const slope=Math.hypot(groundHeight(x+2,z)-groundHeight(x-2,z),groundHeight(x,z+2)-groundHeight(x,z-2))/4;
-    if(y<455||slope>1.65||noise(x*.017,z*.017)<.4||roads.some(p=>Math.hypot(x-p[0],z-p[1])<8))continue;
+    if(!withinMap(x,z,70)||y<455||slope>1.65||noise(x*.017,z*.017)<.4||roads.some(p=>Math.hypot(x-p[0],z-p[1])<8))continue;
     const key=Math.floor(x/220)+','+Math.floor(z/220);if(!under.has(key))under.set(key,[]);
     const p={x,y:y-.08,z,scale:.6+random()*1.3,angle:random()*6.28};under.get(key).push(p);if(i%4===0)flowers.push(p);
   }

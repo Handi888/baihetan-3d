@@ -57,10 +57,10 @@ export function createDam(materials,{details=true}={}) {
     for(const y of [y0,y1])inner.quad(damPoint(u0,y,-1),damPoint(u1,y,-1),damPoint(u1,y,back),damPoint(u0,y,back),y===y1);
     for(const u of [u0,u1])inner.quad(damPoint(u,y0,back),damPoint(u,y0,-1),damPoint(u,y1,-1),damPoint(u,y1,back),u===u1);
     const im=mesh(inner.geometry(),materials.darkConcrete,root);im.material.side=THREE.DoubleSide;im.name='Independent opening lining';
-    const gate=new MeshBuilder(); const layer=o.kind==='drain'?back:o.kind==='sealed'?-.92:.60;
+    const gate=new MeshBuilder(); const layer=o.kind==='drain'?back:o.kind==='sealed'?.35:.60;
     gate.quad(damPoint(u0,y0,layer),damPoint(u1,y0,layer),damPoint(u1,y1,layer),damPoint(u0,y1,layer));
-    const g=mesh(gate.geometry(),o.kind==='drain'?materials.recess:o.kind==='sealed'?materials.sealed:materials.gate,root);g.material.side=THREE.DoubleSide;g.name=`${o.kind} ${o.index+1}`;
-    if(!['sealed','drain'].includes(o.kind)){
+    const g=mesh(gate.geometry(),o.kind==='drain'?materials.recess:materials.gate,root);g.material.side=THREE.DoubleSide;g.name=`${o.kind} ${o.index+1}`;
+    if(o.kind!=='drain'){
       // Small radial rim projecting from the downstream face; never a black decal.
       const rim=new MeshBuilder(); const border=o.kind==='surface'?.006:.0065;
       for(const u of [u0-border,u1])rim.quad(damPoint(u,y0-2,-1,-2.5),damPoint(u+border,y0-2,-1,-2.5),damPoint(u+border,y1+2,-1,-2.5),damPoint(u,y1+2,-1,-2.5));
@@ -76,25 +76,29 @@ export function createDam(materials,{details=true}={}) {
       for(let i=0;i<352;i++){
         const u0=-.978+i*.00555,u1=u0+.00555;
         const p=(u,h,d)=>damPoint(u,h,-1,d);
-        ledge.quad(p(u0,y,-1.25),p(u1,y,-1.25),p(u1,y+.65,-1.25),p(u0,y+.65,-1.25));
-        ledge.quad(p(u0,y+.65,-1.25),p(u1,y+.65,-1.25),p(u1,y+.65,0),p(u0,y+.65,0));
-        ledge.quad(p(u1,y,0),p(u0,y,0),p(u0,y,-1.25),p(u1,y,-1.25));
+        ledge.quad(p(u0,y,-2.6),p(u1,y,-2.6),p(u1,y+1.4,-2.6),p(u0,y+1.4,-2.6));
+        ledge.quad(p(u0,y+1.4,-2.6),p(u1,y+1.4,-2.6),p(u1,y+1.4,0),p(u0,y+1.4,0));
+        ledge.quad(p(u1,y,0),p(u0,y,0),p(u0,y,-2.6),p(u1,y,-2.6));
       }
       mesh(ledge.geometry(),materials.darkConcrete,group).name='Curved horizontal dam-face gallery band';
     }
     // 纵向墩柱和横梁形成中部泄洪建筑组团，真实保留 6 表孔、7 深孔的空洞。
     function projectingBlock(u0,u1,y0,y1){
       const b=new MeshBuilder(),p=(u,y,d)=>damPoint(u,y,-1,d);
-      b.quad(p(u0,y0,-4.2),p(u1,y0,-4.2),p(u1,y1,-4.2),p(u0,y1,-4.2));
-      for(const y of [y0,y1])b.quad(p(u0,y,0),p(u1,y,0),p(u1,y,-4.2),p(u0,y,-4.2),y===y0);
-      for(const u of [u0,u1])b.quad(p(u,y0,0),p(u,y0,-4.2),p(u,y1,-4.2),p(u,y1,0),u===u1);
+      b.quad(p(u0,y0,-8),p(u1,y0,-8),p(u1,y1,-8),p(u0,y1,-8));
+      for(const y of [y0,y1])b.quad(p(u0,y,0),p(u1,y,0),p(u1,y,-8),p(u0,y,-8),y===y0);
+      for(const u of [u0,u1])b.quad(p(u,y0,0),p(u,y0,-8),p(u,y1,-8),p(u,y1,0),u===u1);
       mesh(b.geometry(),materials.darkConcrete,group).name='Independent spillway pier and beam';
     }
     for(const kind of ['surface','deep']){
       const row=makeOpenings().filter(o=>o.kind===kind),bottom=row[0].y0,top=row[0].y1;
-      for(const o of row)for(const u of [o.u0-.005,o.u1])projectingBlock(u,u+.005,bottom-3,top+5);
-      projectingBlock(row[0].u0-.005,row.at(-1).u1+.005,top+2,top+5);
+      for(const o of row)for(const u of [o.u0-.009,o.u1])projectingBlock(u,u+.009,bottom-3,top+5);
+      projectingBlock(row[0].u0-.009,row.at(-1).u1+.009,top+2,top+5);
     }
+    // 中部出挑检修框架把两排孔口连成视频中的整体建筑组团。
+    const deep=makeOpenings().filter(o=>o.kind==='deep'),uLeft=deep[0].u0-.012,uRight=deep.at(-1).u1+.012;
+    for(const u of [uLeft,uRight-.009])projectingBlock(u,u+.009,195,257);
+    projectingBlock(uLeft,uRight,224,227);projectingBlock(uLeft,uRight,195,198);
     for(let i=1;i<31;i++){
       const u=-1+2*i/31; const pts=[];
       for(let j=0;j<=90;j++){const y=H*j/90;if(!openings.some(o=>u>o.u0&&u<o.u1&&y>o.y0-1&&y<o.y1+1))pts.push(damPoint(u,y,-1,-.06));else {if(pts.length>1)line(group,pts.splice(0),0x667771,.18);pts.length=0;}}

@@ -7,7 +7,8 @@ export function createWaterReflections(water,size=768,dynamicRoot=null){
   const normal=new THREE.Vector3(0,1,0),direction=new THREE.Vector3(),target=new THREE.Vector3();
   const clipPlane=new THREE.Plane(),clip=new THREE.Vector4(),q=new THREE.Vector4();
   const bias=new THREE.Matrix4().set(.5,0,0,.5,0,.5,0,.5,0,0,.5,.5,0,0,0,1);
-  const lastWorld=new THREE.Matrix4(),lastProjection=new THREE.Matrix4();
+  const lastProjection=new THREE.Matrix4();
+  const lastEye=new THREE.Vector3(Infinity,Infinity,Infinity),lastRotation=new THREE.Quaternion();
   let dirty=true,lastUpdate=-Infinity,lastDynamic=-Infinity,occlusion=null;
   function buffer(){const rt=new THREE.WebGLRenderTarget(size,size,{type:THREE.HalfFloatType,minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter,depthBuffer:true,generateMipmaps:false});rt.depthTexture=new THREE.DepthTexture(size,size,THREE.UnsignedIntType);return rt;}
   const passes=water.surfaces.map(mesh=>{
@@ -24,7 +25,8 @@ export function createWaterReflections(water,size=768,dynamicRoot=null){
   }
   return {setOcclusion(value){occlusion=value;},invalidate(){dirty=true;},update(renderer,scene,camera,now=performance.now(),force=false){
     if(scene.overrideMaterial)return;camera.updateMatrixWorld();
-    const moved=!lastWorld.equals(camera.matrixWorld)||!lastProjection.equals(camera.projectionMatrix);
+    // OrbitControls 阻尼末端存在极小浮点变化。不要为亚像素抖动重画两遍完整山谷。
+    const moved=lastEye.distanceToSquared(camera.position)>.04||lastRotation.angleTo(camera.quaternion)>.0002||!lastProjection.equals(camera.projectionMatrix);
     const refreshBase=force||((dirty||moved)&&now-lastUpdate>240),refreshDynamic=force||now-lastDynamic>120;
     if(!refreshBase&&!refreshDynamic)return;
     const previousTarget=renderer.getRenderTarget(),previousShadowUpdate=renderer.shadowMap.autoUpdate,waterVisible=water.group.visible,background=scene.background;
@@ -45,6 +47,6 @@ export function createWaterReflections(water,size=768,dynamicRoot=null){
         }
       }
     }finally{water.group.visible=waterVisible;if(dynamicRoot)dynamicRoot.visible=true;scene.background=background;renderer.setClearColor(previousColor,previousAlpha);renderer.shadowMap.autoUpdate=previousShadowUpdate;renderer.setRenderTarget(previousTarget);}
-    if(refreshBase){lastWorld.copy(camera.matrixWorld);lastProjection.copy(camera.projectionMatrix);lastUpdate=now;dirty=false;}lastDynamic=now;
+    if(refreshBase){lastEye.copy(camera.position);lastRotation.copy(camera.quaternion);lastProjection.copy(camera.projectionMatrix);lastUpdate=now;dirty=false;}lastDynamic=now;
   },dispose(){passes.forEach(p=>{p.base.dispose();p.moving.dispose();});}};
 }

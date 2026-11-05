@@ -1,6 +1,6 @@
 import { PARAMS as P } from './config.js';
 import {bankContourOffset} from './bank-layout.js';
-import {naturalHeight,noise as naturalNoise,fbm as naturalFbm} from './reservoir/landscape.js';
+import {naturalHeight,noise as naturalNoise,hash as terrainHash} from './reservoir/landscape.js';
 export const clamp = (x,a,b) => Math.max(a,Math.min(b,x));
 export const mix = (a,b,t) => a+(b-a)*t;
 export const smooth = (a,b,x) => { const t=clamp((x-a)/(b-a),0,1); return t*t*(3-2*t); };
@@ -32,6 +32,11 @@ export function riverCentre(z) {
 export function riverBottomHalfWidth(z) {
   return 72-23*(1-smooth(130,380,Math.abs(z)))+smooth(100,1800,-z)*91+smooth(250,1500,z)*(11+9*Math.sin(z/290));
 }
+// 分片线性的岩脊场有明确的折面、棱线和沟槽，不使用周期波或圆鼓噪声。
+function faultField(x,z){const i=Math.floor(x),j=Math.floor(z),u=x-i,v=z-j;
+  const a=terrainHash(i,j),b=terrainHash(i+1,j),c=terrainHash(i,j+1),d=terrainHash(i+1,j+1);
+  return u+v<1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v);
+}
 export function originalTerrainHeight(x,z) {
   const topWidth=section(P.dam.height).halfWidth;
   const flank=x<riverCentre(z)?-1:1;
@@ -50,10 +55,23 @@ export function originalTerrainHeight(x,z) {
   h+=influence*smooth(20,240,d)*(13*Math.sin(z/67+x/87)+6*Math.sin(z/27+x/42));
   // Actual rock relief outside the engineered faces: coherent ledges and fissures,
   // with zero perturbation at the dam joints or at building foundations.
-  const natural=smooth(390,510,h)*(1-smooth(1500,2100,dist));
-  // 山脊轮廓与局部风化分开：移除高频正弦起伏，避免相同凸点排列成“鞋垫”。
-  const warpX=x+120*(naturalNoise(x*.0017,z*.0017)-.5),warpZ=z+90*(naturalNoise(x*.0021+30,z*.0021)-.5);
-  h+=natural*((naturalFbm(warpX*.008,warpZ*.008)-.5)*38+(naturalNoise(warpX*.035,warpZ*.027)-.5)*4);
+  const natural=smooth(455,540,h);
+  // 上部山体重塑为非对称长岩脊：大尺度决定山势，小尺度只刻蚀沟壑。
+  // 455 m 以下的开挖、挡墙与工程接口保持原轮廓，不以纹理顶替构件。
+  const warpX=x+70*(naturalNoise(x*.0017,z*.0017)-.5),warpZ=z+85*(naturalNoise(x*.0013+30,z*.0013)-.5);
+  const shoulder=475+220*(1-Math.exp(-Math.max(0,dist-340)/430));
+  const longRidge=1-Math.abs(faultField(warpX/480+flank*13,warpZ/730)-.5)*2;
+  const secondary=faultField(warpX/175,warpZ/290+flank*19)-.5;
+  const cleft=1-Math.abs(faultField(warpX/65+warpZ/210,warpZ/160)-.5)*2;
+  // 不等间距的冲沟沿山坡伸展，形成长折面，而非整齐的一排排圆丘。
+  let gullies=0;
+  for(const [i,knot] of [-2810,-2170,-1740,-1410,-1100,-860,-530,-185,155,490,875,1240,1580].entries()){
+    const bend=(flank>0?.22:-.16)*(dist-350)+22*(naturalNoise(dist*.006,i*17)-.5);
+    const width=18+terrainHash(i,flank)*29,depth=22+terrainHash(i+31,flank)*35;
+    gullies+=depth*Math.exp(-Math.abs((z-knot-flank*89-bend)/width)*1.3);
+  }
+  const rock=shoulder+(longRidge-.45)*180+secondary*58-cleft*13-gullies;
+  h=mix(h,rock,natural);
   // Monotone stepped excavation profile: a steep riser followed by a real flat berm.
   // Kept before small building benches so those foundations remain horizontal.
   const rise=P.terrain.benchRise,cell=Math.floor(h/rise),fraction=h/rise-cell;

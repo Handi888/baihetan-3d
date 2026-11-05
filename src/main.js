@@ -13,6 +13,7 @@ import {createBuildings} from './buildings.js';
 import {createEffects} from './effects.js';
 import {installInteractions} from './interaction.js';
 import {groundHeight} from './ground-surface.js';
+import {withinMap} from './map-domain.js';
 import {createCreatures} from './creatures.js';
 import {createTerrainOcclusion} from './render-optimization.js';
 import {createFirstPerson} from './first-person.js';
@@ -50,7 +51,7 @@ document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible'){try{resize();reflections.invalidate();}catch{}}
 });
 const scene=new THREE.Scene(),materials=makeMaterials(),lighting=createEnvironment(scene,renderer),rig=createCamera(canvas);
-scene.fog.density=.000065;
+scene.fog.density=.00017;
 const terrain=createTerrain(materials),dam=createDam(materials),water=createWater();scene.add(terrain,dam,water.group);
 const district=createReservoirDistrict();scene.add(district.group);
 const buildings=createBuildings(materials);scene.add(buildings);
@@ -67,6 +68,7 @@ let currentView='downstream',quality='high',paused=false,waterMoving=true,showLa
 let effects=createEffects();scene.add(effects.group);
 function toast(text){$('#toast').textContent=text;$('#toast').classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').classList.remove('show'),3000);}
 function setView(name,immediate=false){powerhouse?.exit();walker?.stop();currentView=name;rig.preset(name,immediate);document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===name));
+  scene.fog.density=name==='unified'?.000028:.00017;
   const p=PRESETS[name].target;lighting.sun.target.position.set(...p);lighting.sun.position.set(p[0]-550,p[1]+1900,p[2]+1050);lighting.sun.target.updateMatrixWorld();lighting.sun.updateMatrixWorld();renderer.shadowMap.needsUpdate=true;reflections.invalidate();}
 function resize(){
   let w=innerWidth,h=innerHeight;
@@ -131,7 +133,7 @@ const occlusion=createTerrainOcclusion([terrain,dam,buildings],groundHeight);
 reflections.setOcclusion(occlusion);
 const walkRoots=[terrain,dam,buildings,district.features];
 walker=createFirstPerson({canvas,rig,roots:walkRoots,heightAt:groundHeight,
-  bounds:{minX:-P.terrain.halfExtent+2,maxX:P.terrain.halfExtent-2,minZ:-P.terrain.upstreamExtent+2,maxZ:P.terrain.downstreamExtent-2},
+  bounds:{minX:-P.terrain.halfExtent+2,maxX:P.terrain.halfExtent-2,minZ:-P.terrain.upstreamExtent+2,maxZ:P.terrain.downstreamExtent-2,contains:withinMap},
   onStart:()=>{$('#panel-toggle').textContent='控制 ☰';paused=false;$('#pause-button').textContent='Ⅱ 暂停';},
   onChange:active=>{canvas.dataset.walking=String(active);if(!active){canvas.dataset.walkState='';touchWalking.reset();}}
 });

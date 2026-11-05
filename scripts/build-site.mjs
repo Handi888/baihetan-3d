@@ -2,6 +2,7 @@
 import {readdir,readFile,writeFile,mkdir,copyFile,lstat,rm,access} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {transform} from 'esbuild';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const dist=path.resolve(root,'dist'),marker=path.join(dist,'.baihetan-generated');
 if(path.dirname(dist)!==root||path.basename(dist)!=='dist')throw new Error('Unsafe output directory');
@@ -18,7 +19,11 @@ async function walk(relative){for(const entry of await readdir(path.join(root,re
   if(entry.isDirectory())await walk(file);else if(entry.name.endsWith('.js'))files.push(file);
 }}
 await walk('src');
-for(const file of files){const source=path.join(root,file);if((await lstat(source)).isSymbolicLink())throw new Error('Symlink: '+file);const target=path.join(dist,file);await mkdir(path.dirname(target),{recursive:true});await copyFile(source,target);}
+for(const file of files){const source=path.join(root,file);if((await lstat(source)).isSymbolicLink())throw new Error('Symlink: '+file);const target=path.join(dist,file);await mkdir(path.dirname(target),{recursive:true});
+  // 源码保留全部注释，只有发布副本压缩。资源路径和模块目录不变，适配 Pages 子路径。
+  if(/\.(?:js|css)$/.test(file)){const result=await transform(await readFile(source,'utf8'),{loader:file.endsWith('.css')?'css':'js',minify:true,target:'es2020',legalComments:'inline'});await writeFile(target,result.code);}
+  else await copyFile(source,target);
+}
 // 在线兼容入口永远相对于网站目录跳转，不请求访问者的 localhost。
 const alias='<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>白鹤滩三维场景</title><a href="./index.html">进入场景</a><script>location.replace("./index.html"+location.search+location.hash);</script></html>';
 for(const name of ['白鹤滩-坝库一体场景.html','白鹤滩-高精度场景.html']){await writeFile(path.join(dist,name),alias);files.push(name);}

@@ -23,19 +23,20 @@ export function proceduralMaterial(color,{rock=false,retaining=false,roughness=.
         relief=texture2D(rockRelief,q.zy*.037).r*w.x+texture2D(rockRelief,q.xz*.037).r*w.y+texture2D(rockRelief,q.xy*.037).r*w.z;
         float macro=noise3(p*.017),streak=noise3(vec3(p.x*.36,p.y*.008,p.z*.31));
         float engineered=(1.-smoothstep(500.,920.,abs(p.z)))*(1.-smoothstep(400.,470.,p.y));
-        float growth=smoothstep(.23,.65,noise3(p*.012)*.55+noise3(p*.047)*.3+noise3(p*.16)*.15)*(1.-engineered*.98);
+        // 植被连续覆盖缓坡，陡壁露出岩石；不把高对比噪声铺成均匀的鼓包花纹。
+        float growth=smoothstep(.38,.76,vWorldNormal.y)*(.80+.14*noise3(p*.0021))*(1.-engineered*.98);
         // The reference banks have different exposed strata and mineral wash.
         // The colour transition follows the rock, never distorts the fixed geometry.
         vec3 cutRock=mix(vec3(.56,.51,.46),vec3(.48,.51,.53),smoothstep(-160.,160.,p.x));
         vec3 mineral=mix(vec3(.51,.46,.40),cutRock,engineered);
-        mineral=mix(mineral,vec3(.045,.12,.055),growth*.92);
+        mineral=mix(mineral,vec3(.09,.18,.065),growth*.94);
         float joints=1.-smoothstep(.014,.065,abs(noise3(vec3(p.x*.043,p.y*.11,p.z*.052))-.5));
         // Multiscale near-vertical seepage follows the excavation face. Pale
         // mineral wash and dark wet tracks are both visible in all four photos.
         float seepage=pow(noise3(vec3(p.x*.58,p.y*.006,p.z*.61)),2.5);
         float wash=pow(noise3(vec3(p.x*.22,p.y*.014,p.z*.27)),4.);
         float bore=0.;
-        vec3 weathered=mineral*(.48+tex*1.1)*(1.+(macro-.5)*.48-(1.-streak)*engineered*.12-joints*.12-seepage*engineered*.45+wash*engineered*.3-bore*engineered*.05);
+        vec3 weathered=mineral*(.70+tex*.65)*(1.+(macro-.5)*.12-(1.-streak)*engineered*.12-joints*.09-seepage*engineered*.45+wash*engineered*.3-bore*engineered*.05);
         float waterline=mix(259.,24.,smoothstep(-180.,10.,p.z));
         float rockBeach=exp(-abs(p.y-waterline-1.8)/3.8);
         weathered=mix(weathered,vec3(.36,.25,.18)*(tex+.55),rockBeach*.68);
@@ -43,9 +44,9 @@ export function proceduralMaterial(color,{rock=false,retaining=false,roughness=.
         float district=smoothstep(1800.,3600.,-p.z),localY=p.y-259.;
         float fields=noise3(vec3(p.x*.013,localY*.001,p.z*.013))*.65+noise3(p*.031)*.35;
         float cliff=1.-smoothstep(.45,.78,vWorldNormal.y);
-        vec3 grass=mix(vec3(.085,.15,.035),vec3(.28,.35,.105),fields);
+        vec3 grass=mix(vec3(.10,.19,.045),vec3(.19,.28,.08),fields);
         vec3 soil=mix(vec3(.24,.18,.10),vec3(.46,.38,.24),macro);
-        vec3 terrainColor=mix(grass,soil,smoothstep(.42,.65,fields)*(1.-cliff)*.77);
+        vec3 terrainColor=mix(grass,soil,smoothstep(.50,.74,fields)*(1.-cliff)*.24);
         terrainColor=mix(terrainColor,weathered,cliff*.9);
         float terrace=(1.-smoothstep(.03,.17,fract((localY+.9)/10.5)))*smoothstep(30.,85.,localY);
         terrainColor=mix(terrainColor,soil,terrace*.38);
@@ -83,7 +84,7 @@ export function proceduralMaterial(color,{rock=false,retaining=false,roughness=.
       normal=normalize(abs(determinant)*normal-sign(determinant)*(dFdx(relief)*rx+dFdy(relief)*ry));
     `);
   };
-  m.customProgramCacheKey=()=>rock?'fractured-bank-rock-v7':retaining?'square-formwork-wall-v2':'cast-concrete-weather-v4';return m;
+  m.customProgramCacheKey=()=>rock?'angular-ridges-continuous-cover-v8':retaining?'square-formwork-wall-v2':'cast-concrete-weather-v4';return m;
 }
 export function makeMaterials(){return {
   concrete:proceduralMaterial(0xb3b9b4),damConcrete:proceduralMaterial(0x9fa9a5),darkConcrete:proceduralMaterial(0x7a8585),rock:proceduralMaterial(0xabb0ab,{rock:true}),

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {withinMap} from '../map-domain.js';
 import {DECK,heightAt,southShore,northShore,pathZ,mesh,box,rod,ribbon,rng,hash} from './landscape.js';
 
 function platform(root,m){
@@ -39,14 +40,16 @@ function villages(root,m){
   const random=rng(18729);let houses=0;
   for(const cx of [-2750,-1720,-700,520,1570,2570])for(let j=0;j<27;j++){
     const x=cx+(random()-.5)*470,z=northShore(x)-70-random()*350,y=heightAt(x,z),w=7+random()*8,d=7+random()*6,h=5+random()*7;
+    if(!withinMap(x,z-5000,80))continue;
     const home=new THREE.Group();home.name='Scattered village residence';home.position.set(x,y-.8,z);home.rotation.y=(random()-.5)*.8;root.add(home);
     box(home,m.curb,[w+1.4,2,d+1.4],[0,.3,0],'House foundation');box(home,m.wall,[w,h,d],[0,h/2+1,0],'Village white dwelling');
     const roof=mesh(new THREE.ConeGeometry(Math.max(w,d)*.76,2.1,4),m.roof,home,'Pitched village roof');roof.rotation.y=Math.PI/4;roof.position.y=h+2;
     for(let level=0;level<(h>8?2:1);level++)for(const dx of [-.25,.25])box(home,m.windows,[w*.19,1.4,.04],[w*dx,3+level*3,d/2+.03],'Dwelling window');houses++;
   }
-  const road=[];for(let x=-3550;x<=3350;x+=15){const z=northShore(x)-120-45*Math.sin(x/290);road.push([x,heightAt(x,z)+.45,z]);}ribbon(root,road,6.2,m.path);
+  function retainedRoad(points,width,material){let span=[];const flush=()=>{if(span.length>1)ribbon(root,span,width,material);span=[];};for(const p of points){if(withinMap(p[0],p[2]-5000,85))span.push(p);else flush();}flush();}
+  const road=[];for(let x=-3550;x<=3350;x+=15){const z=northShore(x)-120-45*Math.sin(x/290);road.push([x,heightAt(x,z)+.45,z]);}retainedRoad(road,6.2,m.path);
   // 山腰另一路线横穿梯田；固定采样保留每个弯折。
-  const hillRoad=[];for(let x=-3100;x<=2100;x+=13){const z=northShore(x)-570-80*Math.sin(x/340);hillRoad.push([x,heightAt(x,z)+.4,z]);}ribbon(root,hillRoad,4.5,m.curb);
+  const hillRoad=[];for(let x=-3100;x<=2100;x+=13){const z=northShore(x)-420-60*Math.sin(x/340);hillRoad.push([x,heightAt(x,z)+.4,z]);}retainedRoad(hillRoad,4.5,m.curb);
   // 全景参考右侧的零散中层建筑群，采用小范围分布，避免占满山岸。
   for(let i=0;i<9;i++){const x=2450+i*32,z=northShore(x)-45-i%3*24,y=heightAt(x,z),h=20+random()*24;box(root,m.wall,[17,h,13],[x,y+h/2,z],'Distant lakeside midrise');for(let j=3;j<h;j+=3)box(root,m.windows,[14,.65,.15],[x,y+j,z+6.6],'Distant window band');}
   return houses;

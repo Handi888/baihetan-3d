@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {PARAMS as P} from '../config.js';
+import {withinMap} from '../map-domain.js';
 import {heightAt,surfaceNormal,southShore,northShore,pathZ,DECK,noise,rng} from './landscape.js';
 
 // 以枝叶簇为原型，而不是圆球树冠。每个原型有真实树干/分枝和多方向叶片。
@@ -65,7 +66,7 @@ function instance(g,m,points,root,name,palette){
 }
 export function createVegetation(){
   const root=new THREE.Group();root.name='Instanced layered ecological vegetation';const random=rng(81923),trees=[[],[],[]],shrubs=[],grasses=[],reeds=[];
-  function allowed(x,z){return Math.abs(z-pathZ(x))>5.8&&((x-DECK.x)/36)**2+((z-DECK.z)/31)**2>1;}
+  function allowed(x,z){return withinMap(x,z-5000,60)&&Math.abs(z-pathZ(x))>5.8&&((x-DECK.x)/36)**2+((z-DECK.z)/31)**2>1;}
   function add(list,x,z,scale){list.push({x,z,y:heightAt(x,z)-.08,scale,stretch:.82+random()*.35,angle:random()*Math.PI*2});}
   for(let i=0;i<11500;i++){
     let x,z;
@@ -91,7 +92,7 @@ export function createVegetation(){
   }
   const map=sprigTexture(),leaf=windMaterial(new THREE.MeshStandardMaterial({color:0xffffff,map,alphaTest:.39,alphaToCoverage:true,side:THREE.DoubleSide,roughness:.92,metalness:0}),9,.16);
   const bark=new THREE.MeshStandardMaterial({color:0x625b42,roughness:1});
-  const palette=[0x527335,0x43642e,0x637c3d,0x3e642f,0x768d42,0x486c35];
+  const palette=[0x99b46e,0x86a064,0xbed08c,0x91b174,0xb8c67b,0xa3bc76];
   const geometryStats=[];
   for(let k=0;k<3;k++){
     const h=7+k*1.4,r=2.5+k*.28,parts=[branch([0,0,0],[.1,h*.78,0],.21,.075)];

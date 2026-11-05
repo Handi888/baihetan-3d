@@ -22,7 +22,7 @@ export const PARAMS = {
   },
   terrain: {
     // 收紧地图外圈，保留坝址、河道、公园和沿岸完整山脊；精细区步长不变。
-    halfExtent: 3900, upstreamExtent: 10000, downstreamExtent: 2200,
+    halfExtent: 3900, upstreamExtent: 8000, downstreamExtent: 1800,
     nearStep: 4, farStep: 24, nearHalfWidth: 580, nearZMin: -850, nearZMax: 1050,
     benchRise: 24, benchFraction: 0.29,
   },
@@ -45,7 +45,7 @@ export const PARAMS = {
 };
 export const PRESETS = {
   engineering: {title:'电站工程全景',subtitle:'双曲拱坝 · 两岸高边坡 · 上游进水口与林覆山脊',eye:[-95,825,1430],target:[0,230,-65]},
-  unified: {title:'坝库一体总览',subtitle:'同一模型 · 大坝、峡谷、库区与滨水公园',eye:[1600,5500,4100],target:[400,259,-2400]},
+  unified: {title:'坝库一体总览',subtitle:'同一模型 · 大坝、峡谷、库区与滨水公园',eye:[4200,7400,6600],target:[450,210,-2900]},
   reservoir: {title:'上游湖湾',subtitle:'连通坝前的蓝绿湖面 · 梯田 · 远山与村落',eye:[135,363,-4100],target:[-110,339,-6400]},
   park: {title:'滨水公园',subtitle:'库区岸线的一部分 · 白色廊架与乔灌草',eye:[-70,317,-4430],target:[-280,268,-4680]},
   rockshore: {title:'库区岩岸',subtitle:'裸岩与植被入水 · 水面完整连续网格',eye:[-500,399,-5100],target:[-1400,419,-5660]},

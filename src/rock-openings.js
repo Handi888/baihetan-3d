@@ -30,9 +30,18 @@ export function excavatedGroundGeometry(){
       const start=positions.length/3;positions.push(...points[0],...points[1],...points[2]);indices.push(start,start+1,start+2);
     }
   }
-  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setIndex(indices);geometry.computeVertexNormals();
+  // 地图外圈收口到岩基，侧面有实体厚度；不留下悬空的一层山皮。
+  for(let i=0;i<d.boundary.length;i++){
+    const a=d.boundary[i]*3,b=d.boundary[(i+1)%d.boundary.length]*3,k=positions.length/3;
+    positions.push(positions[a],positions[a+1],positions[a+2],positions[b],positions[b+1],positions[b+2],positions[b],-90,positions[b+2],positions[a],-90,positions[a+2]);
+    indices.push(k,k+2,k+1,k,k+3,k+2);
+  }
+  // 真正移除未使用的外圈顶点；不是仅 hidden，也不把矩形地形存入 GPU。
+  const remap=new Map(),compact=[],faces=[];
+  for(const id of indices){if(!remap.has(id)){remap.set(id,compact.length/3);compact.push(positions[id*3],positions[id*3+1],positions[id*3+2]);}faces.push(remap.get(id));}
+  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(compact,3));geometry.setIndex(faces);geometry.computeVertexNormals();
   // Vertices entirely inside a cut have no incident face, hence no computed
   // normal. Give these unused vertices a finite normal without changing faces.
   const n=geometry.attributes.normal;for(let i=0;i<n.count;i++)if(n.getX(i)===0&&n.getY(i)===0&&n.getZ(i)===0)n.setXYZ(i,0,1,0);
-  geometry.userData={realPortalCuts:specs.length,cutTriangles};return geometry;
+  geometry.userData={realPortalCuts:specs.length,cutTriangles,mapAreaKm2:+(d.area/1e6).toFixed(2),rectangularAreaKm2:95.16,footprint:'river corridor and lake shore; closed outer rock edge'};return geometry;
 }

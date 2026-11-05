@@ -13,6 +13,7 @@ import {makeMaterials} from './src/materials.js';
 import {groundHeight} from './src/ground-surface.js';
 import {damPoint} from './src/math.js';
 import {PARAMS as P} from './src/config.js';
+import {withinMap} from './src/map-domain.js';
 const group=new THREE.Group();
 function box(name,size,pos){const m=new THREE.Mesh(new THREE.BoxGeometry(...size));m.name=name;m.position.set(...pos);group.add(m);}
 box('Concrete wall',[.25,3,8],[2,1.5,0]);box('Walk deck',[5,.3,5],[0,1.85,12]);box('Step slab',[2,.3,2],[0,.15,5]);group.updateMatrixWorld(true);
@@ -22,8 +23,10 @@ assert.equal(world.floor(0,12,.5),0,'Do not teleport onto overhead decks');
 assert(Math.abs(world.floor(0,5,.48)-.3)<1e-6,'Small step is walkable');
 assert(world.blocked(1.8,0,0),'Capsule stops before wall');assert(!world.blocked(1.2,0,0),'Open space stays traversable');
 assert(!world.blocked(1.8,0,3.1),'A wall below the feet does not block');
-const mapBounds={minX:-P.terrain.halfExtent+2,maxX:P.terrain.halfExtent-2,minZ:-P.terrain.upstreamExtent+2,maxZ:P.terrain.downstreamExtent-2};
+const mapBounds={minX:-P.terrain.halfExtent+2,maxX:P.terrain.halfExtent-2,minZ:-P.terrain.upstreamExtent+2,maxZ:P.terrain.downstreamExtent-2,contains:withinMap};
 const boundedWorld=createWalkWorld([],groundHeight,mapBounds);
+for(const [x,z] of [[3000,0],[-3000,1000],[-2200,-2800]]){assert(!boundedWorld.contains(x,z));assert.equal(boundedWorld.floor(x,z),-Infinity);assert(boundedWorld.blocked(x,z,800),'Removed mountain zones cannot be walked into');}
+assert(boundedWorld.contains(-285,-4680),'Waterfront park remains accessible');
 for(const [x,z] of [[mapBounds.minX-1,0],[mapBounds.maxX+1,0],[0,mapBounds.minZ-1],[0,mapBounds.maxZ+1]]){
   assert(boundedWorld.blocked(x,z,groundHeight(x,z)),'All four map edges block movement');assert.equal(boundedWorld.floor(x,z),-Infinity,'No clamped invisible floor beyond map');
 }
