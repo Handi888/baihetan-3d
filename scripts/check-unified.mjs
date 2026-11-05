@@ -74,6 +74,10 @@ report.checks.push('Continuous submerged connection from canyon to lake; distric
 const shell=dam.getObjectByName('Layered arch shell'),ray=new THREE.Raycaster();
 for(const o of makeOpenings().filter(o=>o.kind!=='sealed')){const y=(o.y0+o.y1)/2,a=new THREE.Vector3(...damPoint(o.u,y,1,12)),b=new THREE.Vector3(...damPoint(o.u,y,-1,-12));ray.set(a,b.clone().sub(a).normalize());ray.far=a.distanceTo(b);assert.equal(ray.intersectObject(shell).length,0);}
 report.checks.push('Six surface outlets and seven deep outlets remain open through the dam shell');
+// 俯视井筒必须看到低于井口的真实底面，不能被旧薄平台或地形封住。
+const shaftTowers=buildings.getObjectsByProperty('name','Raised rectangular bank shaft');assert.equal(shaftTowers.length,6);
+for(const tower of shaftTowers){const center=tower.getWorldPosition(new THREE.Vector3());ray.set(center.clone().add(new THREE.Vector3(0,tower.userData.rise+4,0)),new THREE.Vector3(0,-1,0));ray.far=tower.userData.rise+8;const hits=ray.intersectObjects([buildings,terrain],true);assert(hits.length&&hits[0].object.name==='Visible shaft recess floor','Raised bank shaft must have an unobstructed, deep opening');assert(hits[0].distance>tower.userData.rise,'Shaft walls must stand above the visible bottom');}
+report.checks.push('Six raised bank shafts have actual thick walls and open recesses, not flat dark patches');
 for(const name of ['unified','reservoir','park','rockshore']){const [x,y,z]=PRESETS[name].eye;assert(y>groundHeight(x,z),'Preset must stay above ground: '+name);}
 report.vegetation=district.vegetation.group.userData;report.features=district.features.userData;report.channelSamples=report.channel.length;report.channelMinDepth=Math.min(...report.channel.map(p=>p.depth));delete report.channel;
 report.passed=true;writeFileSync('docs/qa/UNIFIED_MODEL_AUDIT.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));

@@ -34,19 +34,38 @@ export function createHydraulics(m){
   }
   for(const [bank,p] of P.details.platforms.entries()){
     const spec=intakeLayout(bank),side=spec.side,level=p.y;
+    const lining=m.concrete.clone();lining.roughness=.96;
+    const sourceCompile=m.concrete.onBeforeCompile;
+    lining.onBeforeCompile=shader=>{
+      sourceCompile.call(lining,shader);
+      shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying float vShaftHeight;').replace('#include <worldpos_vertex>',`#include <worldpos_vertex>\nvShaftHeight=(modelMatrix*vec4(transformed,1.)).y-${level.toFixed(1)};`);
+      shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying float vShaftHeight;').replace('#include <color_fragment>',`#include <color_fragment>\ndiffuseColor.rgb*=.16+.7*smoothstep(0.,${bank===0?'15.':'18.'},vShaftHeight);`);
+    };
+    lining.customProgramCacheKey=()=>`shaft-inner-wall-${bank}`;
     const root=new THREE.Group();root.name='Shore-keyed abutment operating terrace';g.add(root);
     // 平台顺岸坡收进山体，前缘弯折，不再是独立悬在水边的大矩形板。
     const front=[],back=[],z0=Math.min(p.z-p.length*.42,spec.z+spec.length/2-8),z1=p.z+p.length*.42;
-    for(let i=0;i<=36;i++){const z=z0+(z1-z0)*i/36,x=groundShoreline(z,level-2,side)-side*4;front.push([x,level,z]);back.push([x+side*(i<5?30:38),level,z]);}
+    for(let i=0;i<=36;i++){const z=z0+(z1-z0)*i/36,x=groundShoreline(z,level-2,side)-side*4;front.push([x,level,z]);back.push([x+side*28,level,z]);}
     const outline=[...front,...back.slice().reverse()],shape=new THREE.Shape();shape.moveTo(outline[0][0],-outline[0][2]);for(const p of outline.slice(1))shape.lineTo(p[0],-p[2]);shape.closePath();
-    // 三个方孔是有深度的检修井，嵌在靠山的条形构筑物里，并非黑方块贴图。
+    // 视频约 10 分钟的斜视近景可见厚壁、抬高的方形井筒，而非薄板上的三个黑方块。
+    // 只据画面重建外形；不把用途和未展示的地下深度臆定为实际工程参数。
     for(let i=0;i<3;i++){
       const z=p.z-29+i*29,x=groundShoreline(z,level-2,side)+side*15,w=10,d=14,hole=new THREE.Path();
       hole.moveTo(x-w/2,-z-d/2);hole.lineTo(x+w/2,-z-d/2);hole.lineTo(x+w/2,-z+d/2);hole.lineTo(x-w/2,-z+d/2);hole.closePath();shape.holes.push(hole);
-      for(const dx of [-5.6,5.6])box(root,m.darkConcrete,[1.2,12,16],[x+dx,level-6,z]).name='Auxiliary shaft side lining';
-      for(const dz of [-7.6,7.6])box(root,m.darkConcrete,[12.4,12,1.2],[x,level-6,z+dz]).name='Auxiliary shaft end lining';
-      box(root,m.gate,[10,.5,14],[x,level-11.5,z]).name='Recessed auxiliary shaft gate';
-      railPath(root,m.rail,[[x-6.6,level,z-8.6],[x+6.6,level,z-8.6],[x+6.6,level,z+8.6],[x-6.6,level,z+8.6],[x-6.6,level,z-8.6]]);
+      const rise=bank===0?15:18,tower=new THREE.Group();tower.name='Raised rectangular bank shaft';tower.position.set(x,level,z);root.add(tower);
+      tower.userData={bank,index:i,clearWidth:w,clearLength:d,rise,reference:'video preview: thick open-topped shaft, dimensions visually estimated'};
+      // 四面独立厚墙，底板高于实际岩面，俯视时孔内不会被未开挖地形填平。
+      for(const dx of [-6,6])box(tower,m.concrete,[2,rise+1,18],[dx,rise/2-.5,0]).name='Raised shaft side wall';
+      for(const dz of [-8,8])box(tower,m.concrete,[10,rise+1,2],[0,rise/2-.5,dz]).name='Raised shaft end wall';
+      for(const dx of [-6,6])box(tower,m.darkConcrete,[2.35,.5,18.6],[dx,rise+.1,0]).name='Shaft coping';
+      for(const dz of [-8,8])box(tower,m.darkConcrete,[10,.5,2.35],[0,rise+.1,dz]).name='Shaft coping';
+      box(tower,m.recess,[10,.45,14],[0,.25,0]).name='Visible shaft recess floor';
+      // 内壁的间接光遮蔽与外露混凝土分开，斜视井口也能读出深度。
+      for(const dx of [-4.98,4.98])box(tower,lining,[.045,rise-.35,14],[dx,rise/2-.1,0]).name='Shaded shaft inner wall';
+      for(const dz of [-6.98,6.98])box(tower,lining,[10,rise-.35,.045],[0,rise/2-.1,dz]).name='Shaded shaft inner wall';
+      // 上下导轨与内壁分缝强化深度，墙体不是一块贴图。
+      for(const dz of [-6,6])box(tower,m.rail,[.22,rise-1,.25],[-side*4.75,rise/2,dz]).name='Shaft internal guide';
+      for(let yy=3;yy<rise;yy+=3)for(const dx of [-7.02,7.02])box(tower,m.joint,[.035,.045,18],[dx,yy,0]).name='Shaft concrete lift joint';
     }
     const top=mesh(new THREE.ExtrudeGeometry(shape,{depth:3,bevelEnabled:false,curveSegments:1}),m.concrete,root);top.rotation.x=-Math.PI/2;top.position.y=level-3;top.name='Contoured operating deck with actual shaft openings';
     const support=new MeshBuilder();

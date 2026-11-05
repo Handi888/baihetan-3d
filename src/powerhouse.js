@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {BANK_CENTRES,UNIT_Z} from './powerhouse-model.js';
+import {createHallReflection} from './hall-reflection.js';
 
 const PARTS=[['intake','压力管道','water'],['spiral','蜗壳','water'],['gate','活动导叶','water'],['runner','混流式转轮','mechanical'],['shaft','主轴','mechanical'],['rotor','转子 · 旋转磁场','electric'],['stator','定子 · 三相绕组','electric'],['bearing','推力轴承','mechanical'],['exciter','励磁装置','electric'],['draft','尾水管','water'],['transformer','主变压器','electric']];
 const STEPS=[
@@ -25,13 +26,13 @@ export function installPowerhouse({scene,renderer,rig,canvas,dam,terrain,beforeE
         <div class="ph-steps" aria-label="发电原理分步讲解">${STEPS.map((s,i)=>`<button data-ph-step="${i}" title="${s.tag}" aria-label="${s.tag}">${String(i+1).padStart(2,'0')}</button>`).join('')}</div>
         <div class="ph-step-nav"><button id="ph-overview">完整机组</button></div>
         <div class="ph-rule"></div>
-        <div class="ph-select-row"><label>厂房<select id="ph-bank"><option value="0">左岸厂房</option><option value="1">右岸厂房</option></select></label><label>机组<select id="ph-unit">${Array.from({length:8},(_,i)=>`<option value="${i}">${String(i+1).padStart(2,'0')} 号机组</option>`).join('')}</select></label></div>
-        <label class="ph-range">山体不透明度 <output id="ph-rock-value">15%</output><input id="ph-rock" type="range" min="5" max="100" value="15" step="1"></label>
+        <div class="ph-select-row"><label>厂房<select id="ph-bank"><option value="0">左岸厂房</option><option value="1">右岸厂房</option></select></label><label id="ph-unit-select">机组<select id="ph-unit">${Array.from({length:8},(_,i)=>`<option value="${i}">${String(i+1).padStart(2,'0')} 号机组</option>`).join('')}</select></label></div>
+        <label class="ph-range" id="ph-rock-control">山体不透明度 <output id="ph-rock-value">15%</output><input id="ph-rock" type="range" min="5" max="100" value="15" step="1"></label>
         <div id="ph-unit-controls">
           <label class="ph-option"><span>外壳剖开</span><input type="checkbox" id="ph-cut" checked></label>
           <label class="ph-option"><span>部件分解</span><input type="checkbox" id="ph-explode"></label>
           <label class="ph-option"><span>水流与电能方向</span><input type="checkbox" id="ph-flow" checked></label>
-          <label class="ph-option"><span>磁场示意</span><input type="checkbox" id="ph-field" checked></label>
+          <label class="ph-option"><span>磁场示意</span><input type="checkbox" id="ph-field"></label>
           <label class="ph-option"><span>部件标注</span><input type="checkbox" id="ph-labels" checked></label>
           <label class="ph-range">导叶开度 <output id="ph-gate-value">72%</output><input id="ph-gate" type="range" min="0" max="100" value="72" step="1"></label>
           <output id="ph-operation" hidden></output>
@@ -48,7 +49,7 @@ export function installPowerhouse({scene,renderer,rig,canvas,dam,terrain,beforeE
   const labels=PARTS.map(([key,text,type],i)=>{
     const el=document.createElement('div');el.className=`ph-label ${type}`;el.innerHTML=`<i></i><span><b>${String(i+1).padStart(2,'0')}</b>${text}</span>`;labelLayer.append(el);return {key,el};
   });
-  let model=null,active=false,loading=false,mode='unit',bank=0,unit=0,step=-1,running=true,showLabels=true,exploded=false,saved=null,labelFrame=0;
+  let model=null,hallReflection=null,active=false,loading=false,mode='unit',bank=0,unit=0,step=-1,running=true,showLabels=true,exploded=false,saved=null,labelFrame=0;
   const lightGroup=new THREE.Group();lightGroup.name='地下展陈照明';lightGroup.visible=false;
   lightGroup.add(new THREE.HemisphereLight(0xc9e9ff,0x24404a,1.3));
   const key=new THREE.DirectionalLight(0xe3f4ff,2.6);key.position.set(70,120,100);lightGroup.add(key);
@@ -67,7 +68,7 @@ export function installPowerhouse({scene,renderer,rig,canvas,dam,terrain,beforeE
       eye=new THREE.Vector3(...s.eye).add(origin);target=new THREE.Vector3(...s.target).add(origin);
       rig.controls.minDistance=6;rig.controls.maxDistance=170;rig.camera.near=.12;rig.camera.fov=42;
     }else if(mode==='hall'){
-      const p=new THREE.Vector3(...BANK_CENTRES[bank]);eye=p.clone().add(new THREE.Vector3(12,42,198));target=p.clone().add(new THREE.Vector3(-1,34,-100));
+      const p=new THREE.Vector3(...BANK_CENTRES[bank]);eye=p.clone().add(new THREE.Vector3(6,39,198));target=p.clone().add(new THREE.Vector3(-1,37,-110));
       rig.controls.minDistance=1;rig.controls.maxDistance=650;rig.camera.near=.2;rig.camera.fov=59;
     }else{
       eye=new THREE.Vector3(1230,1070,1630);target=new THREE.Vector3(0,110,-60);rig.controls.minDistance=160;rig.controls.maxDistance=3500;rig.camera.near=2;rig.camera.fov=47;
@@ -77,10 +78,13 @@ export function installPowerhouse({scene,renderer,rig,canvas,dam,terrain,beforeE
   }
   function setMode(value){
     mode=value;model.setMode(mode);
+    hallReflection?.disable();
     if(saved){for(const [o,visible] of saved.objects)if(o.isLight)o.visible=mode==='system'&&visible;scene.fog=mode==='system'?saved.fog:null;}
     lightGroup.visible=mode!=='system';
     $('#ph-location').textContent=`${bank===0?'左岸':'右岸'}厂房 · ${String(bank*8+unit+1).padStart(2,'0')} 号机组`;
     $('#ph-unit-controls').hidden=mode!=='unit';labelLayer.hidden=mode!=='unit';
+    $('.ph-steps').hidden=mode!=='unit';$('.ph-step-nav').hidden=mode!=='unit';
+    $('#ph-unit-select').hidden=mode!=='unit';$('#ph-rock-control').hidden=mode==='hall';
     document.querySelectorAll('[data-ph-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.phView===mode)));
     if(mode==='hall'){
       $('#ph-tag').textContent='地下厂房';$('#ph-title').textContent=`${bank===0?'左岸':'右岸'} · 八台机组`;
@@ -101,7 +105,7 @@ export function installPowerhouse({scene,renderer,rig,canvas,dam,terrain,beforeE
     if(active){setMode(initial);return;}if(loading)return;loading=true;const button=$('#powerhouse-button');button.disabled=true;button.textContent='正在构建内部机组…';
     try{
       beforeEnter();
-      if(!model){const {createPowerhouseModel}=await import('./powerhouse-model.js');model=createPowerhouseModel();model.root.visible=false;scene.add(model.root);}
+      if(!model){const {createPowerhouseModel}=await import('./powerhouse-model.js');model=createPowerhouseModel();model.root.visible=false;scene.add(model.root);hallReflection=createHallReflection(model,lightGroup);}
       saved={objects:scene.children.filter(o=>o!==model.root&&o!==lightGroup).map(o=>[o,o.visible]),background:scene.background,fog:scene.fog,override:scene.overrideMaterial,exposure:renderer.toneMappingExposure,position:rig.camera.position.clone(),target:rig.controls.target.clone(),fov:rig.camera.fov,near:rig.camera.near,min:rig.controls.minDistance,max:rig.controls.maxDistance,polar:rig.controls.maxPolarAngle,minPolar:rig.controls.minPolarAngle,damping:rig.controls.enableDamping,localClipping:renderer.localClippingEnabled,terrainMaterials:[],xray:new Map()};
       // 仅改变覆盖岩体的透明度，不移动地下设备，不切掉原有水面三角形。
       const forest=terrain.getObjectByName('Canyon natural ridge forest');saved.forest=[forest,forest.visible];forest.visible=false;
@@ -152,6 +156,7 @@ export function installPowerhouse({scene,renderer,rig,canvas,dam,terrain,beforeE
   const projection=new THREE.Vector3();
   function update(dt){
     if(!active)return;rig.controls.update();model.update(dt,running&&!exploded);rig.camera.updateMatrixWorld();
+    if(mode==='hall')hallReflection.update(renderer,scene,rig.camera,bank);
     if(labelFrame++%4===0){
       const w=canvas.clientWidth,h=canvas.clientHeight,small=w<=850,occupied=[];const focus=step>=0?STEPS[step].parts:null;
       for(const l of labels){

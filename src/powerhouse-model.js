@@ -34,6 +34,58 @@ function instance(parent,geo,mat,transforms,name){
   transforms.forEach((t,i)=>{dummy.position.set(...t.p);dummy.rotation.set(...(t.r||[0,0,0]));dummy.scale.set(...(t.s||[1,1,1]));dummy.updateMatrix();m.setMatrixAt(i,dummy.matrix);});m.computeBoundingSphere();parent.add(m);return m;
 }
 
+/** 厂房表面使用 PBR，并把静态顶灯的柔和照度和墙脚遮蔽烘焙到材质中。
+ * 不为数百盏灯各建实时光源；模型剖开时仍沿用同一坐标和材质。 */
+function hallFinish(color,bank,kind,reflection){
+  const m=new THREE.MeshPhysicalMaterial({color,metalness:kind==='floor'?.08:.03,roughness:kind==='floor'?.3:.76,clearcoat:kind==='floor'?.3:0,clearcoatRoughness:.22});
+  m.onBeforeCompile=s=>{
+    s.vertexShader=s.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vHallPoint;').replace('#include <worldpos_vertex>',`#include <worldpos_vertex>\nvHallPoint=(modelMatrix*vec4(transformed,1.)).xyz-vec3(${bank?650:-650}.0,65.,0.);`);
+    s.fragmentShader=s.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vHallPoint;').replace('#include <color_fragment>',`#include <color_fragment>
+      vec3 hp=vHallPoint;
+      float grain=fract(sin(dot(floor(hp*23.),vec3(12.9898,78.233,37.719)))*43758.5453);
+      diffuseColor.rgb*=.98+(grain-.5)*.025;
+      ${kind==='wall'?`
+        float lightZ=mod(hp.z+6.,12.)-6.;
+        float wash=exp(-lightZ*lightZ/12.-pow((hp.y-61.)/9.,2.));
+        float foot=.23*exp(-max(0.,hp.y-28.)/2.8);
+        diffuseColor.rgb*=.78+wash*.3-foot;
+      `:kind==='floor'?`
+        float edge=clamp((18.-abs(hp.x))/3.,0.,1.);
+        float seam=1.-smoothstep(.01,.035,abs(mod(hp.z+24.,48.)-24.));
+        diffuseColor.rgb*=.77+.23*edge-seam*.06;
+      `:`
+        float rib=exp(-pow((mod(hp.z+6.,12.)-6.)/.3,2.));
+        float beam=exp(-pow((mod(hp.x+2.5,5.)-2.5)/.22,2.));
+        diffuseColor.rgb*=.83-rib*.16-beam*.12;
+      `}
+    `);
+    if(kind==='floor'){
+      Object.assign(s.uniforms,reflection);
+      s.fragmentShader=s.fragmentShader.replace('#include <common>',`#include <common>
+        uniform sampler2D uHallReflection;
+        uniform mat4 uHallReflectionMatrix;
+        uniform float uHallReflectionReady;
+      `).replace('#include <opaque_fragment>',`
+        // 原厂房的平面倒影；粗糙地坪用邻域采样柔化，非粘贴的虚构纹理。
+        vec3 hpWorld=vHallPoint+vec3(${bank?650:-650}.0,65.,0.);
+        vec4 rp=uHallReflectionMatrix*vec4(hpWorld,1.);
+        vec2 uv=rp.xy/max(rp.w,.0001);
+        if(uHallReflectionReady>.5&&rp.w>0.&&uv.x>0.&&uv.x<1.&&uv.y>0.&&uv.y<1.){
+          vec3 reflected=texture2D(uHallReflection,uv).rgb*.4;
+          reflected+=texture2D(uHallReflection,uv+vec2(.0025,0.)).rgb*.15;
+          reflected+=texture2D(uHallReflection,uv-vec2(.0025,0.)).rgb*.15;
+          reflected+=texture2D(uHallReflection,uv+vec2(0.,.0025)).rgb*.15;
+          reflected+=texture2D(uHallReflection,uv-vec2(0.,.0025)).rgb*.15;
+          float grazing=1.-abs(normalize(cameraPosition-hpWorld).y);
+          outgoingLight=mix(outgoingLight,reflected,.10+.24*pow(grazing,3.));
+        }
+        #include <opaque_fragment>
+      `);
+    }
+  };
+  m.customProgramCacheKey=()=>`hall-${bank}-${kind}-v2`;return m;
+}
+
 // 非均匀蜗壳：沿周向截面逐渐收缩，上半壳可移走；切边由独立厚边线显示。
 function spiralGeometry(top=false){
   const p=[],idx=[],steps=120,sides=20;
@@ -67,23 +119,30 @@ export function createPowerhouseModel(){
   const root=new THREE.Group();root.name='两岸地下引水发电系统 · 教学剖视';
   const m={steel:material(0xa7bfcb,.83,.26),dark:material(0x293b48,.65,.32),blue:material(0x477e98,.5,.35),concrete:material(0xb5bec1,.02,.85),floor:material(0xa8c0c7,.12,.38),white:material(0xe8ece7,.1,.52),copper:material(0xdca25a,.8,.26),red:material(0xbe514b,.45,.4),navy:material(0x286e9f,.5,.35),yellow:material(0xf3b445,.3,.4),black:material(0x142d38,.3,.45)};
   m.floor=new THREE.MeshPhysicalMaterial({color:0xb8c6c9,roughness:.28,metalness:.08,clearcoat:.3,clearcoatRoughness:.22});
-  m.blue.color.set(0x5099bb);
+  m.blue.color.set(0x51798c);
+  m.insulation=material(0xd5d5c9,.18,.38);
   m.glow=new THREE.MeshStandardMaterial({color:0xe8f7ff,emissive:0xcceaff,emissiveIntensity:2.2});
   m.water=new THREE.MeshStandardMaterial({color:0x45d9eb,metalness:.15,roughness:.25,transparent:true,opacity:.18,depthWrite:false,side:THREE.DoubleSide});
   m.pipe=new THREE.MeshStandardMaterial({color:0x68adc3,metalness:.6,roughness:.3,transparent:true,opacity:.24,depthWrite:false,side:THREE.DoubleSide});
   m.spiral=material(0x417e91,.63,.32);m.spiral.side=THREE.DoubleSide;
   const halls=[],systems=[],covers=[],banks=[];
+  const floorReflection={uHallReflection:{value:null},uHallReflectionMatrix:{value:new THREE.Matrix4()},uHallReflectionReady:{value:0}};
   for(let bank=0;bank<2;bank++){
     const side=bank===0?-1:1,b=group(root,bank===0?'左岸 · 8 台机组':'右岸 · 8 台机组');b.position.set(...BANK_CENTRES[bank]);banks.push(b);
     const hall=group(b,'主厂房 · 发电机层');halls.push(hall);
+    // 两张厂房参考各保留自身配色和设施布置；不据渲染截图判断实际左右岸装修。
+    const hallWall=hallFinish(bank?0xd4d1c3:0xc3cbd0,bank,'wall'),hallFloor=hallFinish(bank?0xb9ad91:0x94adb9,bank,'floor',floorReflection);
+    const hallRoof=hallFinish(bank?0x69716c:0x4b535b,bank,'roof');hallRoof.side=THREE.DoubleSide;
+    const coverMat=material(bank?0xc5ceca:0x4296c2,.22,.38),craneMat=material(bank?0xce8d27:0xb43c3d,.42,.4);
     const system=group(b,'引水竖井与尾水支洞');systems.push(system);
     const coverGroup=group(b,'8 台发电机组');covers.push(coverGroup);
+    for(const z of [-200,200])box(hall,hallFloor,[36,1.4,16],[0,27.3,z],'厂房端部安装场地坪');
     // 地面保留真实圆形机坑，旁侧检修道和每跨地板均单独建模。
     for(let i=0;i<8;i++){
       const systemStart=system.children.length;
       const z=UNIT_Z[i],floorShape=new THREE.Shape();floorShape.moveTo(-18,-24);floorShape.lineTo(18,-24);floorShape.lineTo(18,24);floorShape.lineTo(-18,24);floorShape.closePath();
       const hole=new THREE.Path();hole.absarc(0,0,11,0,TAU,true);floorShape.holes.push(hole);
-      const floor=mesh(hall,new THREE.ExtrudeGeometry(floorShape,{depth:1.4,bevelEnabled:false,curveSegments:64}),m.floor,'带机坑的发电机层楼板',[0,26.6,z]);floor.rotation.x=-Math.PI/2;
+      const floor=mesh(hall,new THREE.ExtrudeGeometry(floorShape,{depth:1.4,bevelEnabled:false,curveSegments:64}),hallFloor,'带机坑的发电机层楼板',[0,26.6,z]);floor.rotation.x=-Math.PI/2;
       for(const y of [-17,12]){
         const plate=new THREE.Shape();plate.moveTo(-18,-24);plate.lineTo(18,-24);plate.lineTo(18,24);plate.lineTo(-18,24);plate.closePath();
         const opening=new THREE.Path();opening.absarc(0,0,y<0?7:3.5,0,TAU,true);plate.holes.push(opening);
@@ -91,10 +150,12 @@ export function createPowerhouseModel(){
       }
       for(const x of [-17,17])for(const dz of [-23,23])box(hall,m.concrete,[1.5,45,1.5],[x,5.5,z+dz],'地下厂房层间立柱');
       const cover=group(coverGroup,`${bank*8+i+1} 号机组`);cover.position.z=z;cover.userData.unit=i;
-      cylinder(cover,m.blue,10.7,.48,[0,28.3,0],10.7,'蓝色机组盖板');cylinder(cover,m.blue,2.9,2.3,[0,29.7,0],2.9,'励磁罩');torus(cover,m.dark,10.75,.12,28.6);
+      cylinder(cover,coverMat,10.7,.16,[0,28.04,0],10.7,'贴合地坪的机组盖板');cylinder(cover,coverMat,2.75,1.7,[0,29.02,0],2.75,'励磁罩');torus(cover,m.dark,10.75,.065,28.14);
+      for(let k=0;k<8;k++){
+        const a=k*TAU/8;rod(cover,m.dark,[2.8*Math.cos(a),28.13,2.8*Math.sin(a)],[10.6*Math.cos(a),28.13,10.6*Math.sin(a)],.012,'盖板分缝');
+      }
       for(let k=0;k<12;k++){
-        const a=k*TAU/12;rod(cover,m.dark,[3*Math.cos(a),28.57,3*Math.sin(a)],[10.6*Math.cos(a),28.57,10.6*Math.sin(a)],.025,'盖板分缝');
-        const vent=box(cover,m.black,[.56,.8,.08],[Math.sin(a)*2.91,29.65,Math.cos(a)*2.91],'励磁罩通风格栅');vent.rotation.y=a;
+        const a=k*TAU/12,vent=box(cover,m.black,[.56,.65,.06],[Math.sin(a)*2.76,29.02,Math.cos(a)*2.76],'励磁罩通风格栅');vent.rotation.y=a;
       }
       // 低成本机组外壳仅供系统总览，精细转轮/线圈仅在聚焦的机组内构建。
       cylinder(system,m.blue,8.9,6,[0,21,z],8.9,'发电机外壳');cylinder(system,m.dark,1.1,16,[0,11,z],1.1,'立轴');torus(system,m.blue,9.2,3,5.2).position.z=z;
@@ -123,38 +184,47 @@ export function createPowerhouseModel(){
       pipe(system,m.pipe,[[side*110,-29,340+i*75],[side*100,-38,440+i*50],[outX,-42,outZ]],7,'尾水隧洞');
     }
     for(const x of [-19,19]){
-      box(hall,m.white,[1.4,36,416],[x,46,0],'厂房纵墙');box(hall,m.dark,[1.6,1,416],[x-.8*Math.sign(x),57,0],'桥机轨道梁');
+      box(hall,hallWall,[1.4,36,416],[x,46,0],'厂房纵墙');box(hall,m.dark,[1.6,1,416],[x-.8*Math.sign(x),57,0],'桥机轨道梁');
       const seams=[],lamps=[],vents=[];
-      for(let z=-202;z<=202;z+=6){seams.push({p:[x-Math.sign(x)*.72,45,z],s:[.022,33,.028]});if((z+202)%12===0)lamps.push({p:[x-Math.sign(x)*.8,45,z],s:[.16,15,.16]});}
+      for(let z=-204;z<=204;z+=3){seams.push({p:[x-Math.sign(x)*.72,45,z],s:[.022,33,.028]});if(bank===1&&z%12===0)lamps.push({p:[x-Math.sign(x)*.8,45,z],s:[.16,15,.16]});}
       for(let y=30;y<64;y+=3)seams.push({p:[x-Math.sign(x)*.74,y,0],s:[.02,.025,416]});
-      for(let z=-198;z<200;z+=1.8)vents.push({p:[x-Math.sign(x)*.85,30.3,z],s:[.1,2.3,.8]});
-      instance(hall,new THREE.BoxGeometry(1,1,1),m.concrete,seams,'墙面方格分缝');instance(hall,new THREE.BoxGeometry(1,1,1),m.glow,lamps,'纵墙灯带');instance(hall,new THREE.BoxGeometry(1,1,1),m.dark,vents,'通风格栅');
+      for(let z=-198;z<200;z+=1.1)if(Math.abs((z+168+24)%48-24)<18)vents.push({p:[x-Math.sign(x)*.85,29.8,z],s:[.1,2.7,.72]});
+      instance(hall,new THREE.BoxGeometry(1,1,1),m.concrete,seams,'墙面方格分缝');if(lamps.length)instance(hall,new THREE.BoxGeometry(1,1,1),m.glow,lamps,'纵墙灯带');instance(hall,new THREE.BoxGeometry(1,1,1),m.dark,vents,'通风格栅');
       // 服务廊道护栏及检修孔，用实心分段地板和栏杆表现。
-      for(let z=-182;z<190;z+=48){
-        const px=x*.78;box(hall,m.dark,[3,.3,5],[px,28.1,z],'检修盖板');
-        for(const dx of [-1.6,1.6])for(const dz of [-2.6,2.6])rod(hall,m.red,[px+dx,28,z+dz],[px+dx,29.6,z+dz],.08);
-        for(const dy of [.8,1.6])for(const dx of [-1.6,1.6])rod(hall,m.red,[px+dx,28+dy,z-2.6],[px+dx,28+dy,z+2.6],.07);
+      if(x>0)for(let z=-182;z<190;z+=48){
+        const px=x*.78;box(hall,m.dark,[3.4,.18,6],[px,28.1,z],'检修盖板');
+        for(const dx of [-1.8,1.8])for(const dz of [-3.2,3.2])rod(hall,m.red,[px+dx,28,z+dz],[px+dx,29.6,z+dz],.08);
+        for(const dy of [.8,1.6]){
+          for(const dx of [-1.8,1.8])rod(hall,m.red,[px+dx,28+dy,z-3.2],[px+dx,28+dy,z+3.2],.07);
+          for(const dz of [-3.2,3.2])rod(hall,m.red,[px-1.8,28+dy,z+dz],[px+1.8,28+dy,z+dz],.07);
+        }
+      }
+      if(x>0){
+        for(const y of [28.75,29.5])rod(hall,m.red,[18, y,-201],[18,y,201],.065,'连续侧廊护栏');
+        const posts=[];for(let z=-201;z<=201;z+=3)posts.push({p:[18,28.75,z],s:[.09,1.5,.09]});instance(hall,new THREE.BoxGeometry(1,1,1),m.red,posts,'侧廊护栏立柱');
       }
     }
     // 拱顶肋架 + 排列灯具，不用几十盏实时点光源拖慢画面。
-    for(let z=-204;z<=204;z+=24){const pts=[];for(let i=0;i<=24;i++){const a=Math.PI*i/24;pts.push([19*Math.cos(a),64+9*Math.sin(a),z]);}pipe(hall,m.dark,pts,.3,'拱顶钢肋',24);}
+    for(let z=-204;z<=204;z+=12){const pts=[];for(let i=0;i<=24;i++){const a=Math.PI*i/24;pts.push([19*Math.cos(a),64+9*Math.sin(a),z]);}pipe(hall,m.dark,pts,.14,'拱顶钢肋',24);}
     const roofP=[],roofI=[];for(let j=0;j<=48;j++){const a=Math.PI*j/48;for(const z of [-208,208])roofP.push(19.3*Math.cos(a),64.3+9.2*Math.sin(a),z);if(j<48){const n=j*2;roofI.push(n,n+1,n+2,n+1,n+3,n+2);}}
-    const roofG=new THREE.BufferGeometry();roofG.setAttribute('position',new THREE.Float32BufferAttribute(roofP,3));roofG.setIndex(roofI);roofG.computeVertexNormals();const roofM=material(0x8b9695,.15,.72);roofM.side=THREE.DoubleSide;mesh(hall,roofG,roofM,'完整拱顶衬砌');
-    const lamps=[];for(const x of [-12,0,12])for(let z=-192;z<=192;z+=12)lamps.push({p:[x,66, z],s:[.75,.15,.75]});instance(hall,new THREE.SphereGeometry(1,12,6),m.glow,lamps,'三排顶灯');
+    const roofG=new THREE.BufferGeometry();roofG.setAttribute('position',new THREE.Float32BufferAttribute(roofP,3));roofG.setIndex(roofI);roofG.computeVertexNormals();const roofM=hallRoof;mesh(hall,roofG,roofM,'完整拱顶衬砌');
+    const lamps=[],housings=[];for(const x of [-12,-4,4,12])for(let z=-192;z<=192;z+=12){const y=64+9*Math.sqrt(1-(x/19)**2)-.4;lamps.push({p:[x,y,z],s:[.5,.07,.5]});housings.push({p:[x,y+.18,z],s:[.65,.2,.65]});}
+    instance(hall,new THREE.CylinderGeometry(1,1,1,20),m.dark,housings,'顶灯金属灯罩');instance(hall,new THREE.CylinderGeometry(1,1,1,20),m.glow,lamps,'四排顶灯');
+    for(const x of [-15,-8,8,15])box(hall,m.dark,[.16,.2,416],[x,64+9*Math.sqrt(1-(x/19)**2)-.15,0],'顶棚纵向支架');
     for(const z of [-208,208]){
-      box(hall,m.white,[38,36,1.4],[0,46,z],'厂房端墙');
+      box(hall,hallWall,[38,36,1.4],[0,46,z],'厂房端墙');
       const cap=new THREE.Shape();cap.moveTo(19,64);cap.absellipse(0,64,19,9,0,Math.PI,false);cap.closePath();
       mesh(hall,new THREE.ExtrudeGeometry(cap,{depth:1.4,bevelEnabled:false,curveSegments:48}),roofM,'封闭端部拱顶',[0,0,z-.7]);
       box(hall,m.dark,[6.6,9,.15],[0,32.5,z-Math.sign(z)*.8],'端墙检修门');
       for(const x of [-3.6,3.6])box(hall,m.concrete,[.4,9.7,.5],[x,32.8,z-Math.sign(z)],'端墙门框');
     }
-    // 橙色桥式起重机：两根主梁、端梁、小车、护栏、钢索、吊钩。
-    const crane=group(hall,'双梁桥式起重机');crane.position.set(0,57,130);
-    for(const z of [-3,3]){box(crane,m.yellow,[36,2.4,1.5],[0,0,z],'桥机主梁');rod(crane,m.dark,[-17,2,z],[17,2,z],.06);for(let x=-16;x<=16;x+=4)rod(crane,m.dark,[x,1,z],[x,2,z],.06);}
-    for(const x of [-17,17])box(crane,m.yellow,[2.2,2.4,9],[x,0,0],'端梁');
+    // 分别对应蓝色机组/红色远景桥机，以及暖色地坪/橙色近景桥机两张参考。
+    const crane=group(hall,'双梁桥式起重机');crane.position.set(0,57,bank?130:-44);
+    for(const z of [-3,3]){box(crane,craneMat,[36,2.4,1.5],[0,0,z],'桥机主梁');rod(crane,m.dark,[-17,2,z],[17,2,z],.06);for(let x=-16;x<=16;x+=4)rod(crane,m.dark,[x,1,z],[x,2,z],.06);}
+    for(const x of [-17,17])box(crane,craneMat,[2.2,2.4,9],[x,0,0],'端梁');
     const stiffeners=[];for(const z of [-3.8,3.8])for(let x=-15;x<=15;x+=3)stiffeners.push({p:[x,0,z],s:[.13,2.3,.14]});
-    instance(crane,new THREE.BoxGeometry(1,1,1),m.yellow,stiffeners,'桥机腹板加劲肋');
-    box(crane,m.yellow,[2.7,3.4,3.6],[-14,-2.8,0],'桥机司机室');
+    instance(crane,new THREE.BoxGeometry(1,1,1),craneMat,stiffeners,'桥机腹板加劲肋');
+    box(crane,craneMat,[2.7,3.4,3.6],[-14,-2.8,0],'桥机司机室');
     box(crane,m.navy,[2.3,1.5,.06],[-14,-2.3,1.84],'司机室观察窗');
     box(crane,m.red,[5,2,6],[-5,2,0],'起升小车');
     cylinder(crane,m.dark,.7,3.4,[-5,3.5,0],.7,'起升卷筒').rotation.z=Math.PI/2;
@@ -188,20 +258,27 @@ export function createPowerhouseModel(){
   ring(generator,m.dark,9.8,8.5,6.6,18,0,Math.PI,'定子铁芯 · 后半剖');ring(outer,m.blue,10,9.8,6.6,18,Math.PI,Math.PI,'定子机座 · 前半壳');
   const laminations=[];for(let y=18;y<=24.6;y+=.25){const pts=[];for(let i=0;i<=80;i++){const a=Math.PI+i*Math.PI/80;pts.push([9.85*Math.cos(a),y,9.85*Math.sin(a)]);}line(generator,pts,0x607e8b,'铁芯叠片分层');}
   const coilGeo=new THREE.TorusGeometry(1,.16,8,16);const phaseM=[m.copper,m.red,m.navy];
+  // 参考近景的定子绕组具有长直边与弯曲端部：用实际绝缘线棒束替代彩色大圆环。
+  const loopPoints=[];for(let j=0;j<=12;j++){const a=j*Math.PI/12;loopPoints.push(V(.46*Math.cos(a),2.75+.46*Math.sin(a),0));}
+  for(let j=0;j<=12;j++){const a=Math.PI+j*Math.PI/12;loopPoints.push(V(.46*Math.cos(a),-2.75+.46*Math.sin(a),0));}
+  const statorCoilGeo=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(loopPoints,true,'centripetal'),72,.10,8,true);
   for(let i=0;i<36;i++){
     const a=TAU*i/36;
     // 朝观察者的前 120° 留出剖口，可直接看见转子与气隙。
     if(Math.sin(a)>.55)continue;
-    const coil=mesh(generator,coilGeo,phaseM[i%3],'定子三相绕组');coil.position.set(8.55*Math.cos(a),21.3,8.55*Math.sin(a));coil.rotation.y=Math.PI/2-a;coil.scale.set(.42,3.65,1);
+    const bundle=group(generator,'定子三相绕组');bundle.position.set(8.55*Math.cos(a),21.3,8.55*Math.sin(a));bundle.rotation.y=Math.PI/2-a;
+    for(let strand=0;strand<3;strand++)mesh(bundle,statorCoilGeo,m.insulation,'绝缘线棒与端部弯头',[(strand-1)*.075,0,(strand-1)*.16]);
+    box(bundle,phaseM[i%3],[.26,.13,.55],[.46,2.15,0],'绕组相色标记');
     const tooth=box(generator,m.steel,[.42,5.8,.5],[8.65*Math.cos(a),21.3,8.65*Math.sin(a)],'定子齿');tooth.rotation.y=-a;
   }
   ring(generator,m.steel,10,8.4,.4,17.5,0,Math.PI,'下机架外环');
   for(const y of [18.4,21,23.7])for(const a of [Math.PI*1.15,Math.PI*1.4,Math.PI*1.65,Math.PI*1.9])box(generator,m.blue,[1.1,2,1.6],[10.1*Math.cos(a),y,10.1*Math.sin(a)],'冷却器外壳').rotation.y=-a;
   cylinder(rotor,m.dark,2.25,6.3,[0,21.2,0],2.25,'转子中心体');
   ring(rotor,m.steel,7.6,6.8,5.2,18.7,0,TAU,'转子磁轭');
+  const poleFaces=[];
   for(let i=0;i<16;i++){
     const a=i*TAU/16;rod(rotor,m.steel,[1.5*Math.cos(a),21.2,1.5*Math.sin(a)],[7*Math.cos(a),21.2,7*Math.sin(a)],.3,'转子支臂');
-    const pole=box(rotor,i%2?m.navy:m.red,[1.65,4.8,.46],[7.8*Math.cos(a),21.2,7.8*Math.sin(a)],i%2?'转子 S 磁极（示意）':'转子 N 磁极（示意）');pole.rotation.y=Math.PI/2-a;
+    const pole=box(rotor,m.steel,[1.65,4.8,.46],[7.8*Math.cos(a),21.2,7.8*Math.sin(a)],i%2?'转子 S 磁极（示意）':'转子 N 磁极（示意）');pole.rotation.y=Math.PI/2-a;poleFaces.push(pole);
     const winding=mesh(rotor,coilGeo,m.copper,'磁极励磁绕组',[7.55*Math.cos(a),21.2,7.55*Math.sin(a)]);winding.rotation.y=Math.PI/2-a;winding.scale.set(.7,2.5,1);
   }
   ring(top,m.dark,3.1,1.15,1.4,26,0,TAU,'推力轴承');for(let i=0;i<8;i++){const a=i*TAU/8;rod(top,m.steel,[3*Math.cos(a),26.5,3*Math.sin(a)],[9.4*Math.cos(a),26.5,9.4*Math.sin(a)],.22,'上机架径向支臂');}
@@ -239,8 +316,8 @@ export function createPowerhouseModel(){
   const energy=new THREE.InstancedMesh(new THREE.SphereGeometry(.14,7,5),energyMat,30);electricGroup.add(energy);energy.frustumCulled=false;
   const axis=line(detailed,[[0,-12,0],[0,65,0]],0x587786,'分解参考轴');axis.visible=false;
   const sectionPlane=new THREE.Plane(V(0,0,-1),0),hallMaterialCopies=new Map();
-  for(const hall of halls)hall.traverse(o=>{if(!o.isMesh)return;const source=o.material;if(!hallMaterialCopies.has(source))hallMaterialCopies.set(source,source.clone());o.material=hallMaterialCopies.get(source);});
-  const dummy=new THREE.Object3D();let time=0,angle=0,bankIndex=0,unitIndex=0,mode='unit',cut=true,explosion=0,gate=.72,flowOn=true,fieldOn=true;
+  for(const hall of halls)hall.traverse(o=>{if(!o.isMesh)return;const source=o.material;if(!hallMaterialCopies.has(source)){const copy=source.clone();copy.onBeforeCompile=source.onBeforeCompile;copy.customProgramCacheKey=source.customProgramCacheKey;hallMaterialCopies.set(source,copy);}o.material=hallMaterialCopies.get(source);});
+  const dummy=new THREE.Object3D();let time=0,angle=0,bankIndex=0,unitIndex=0,mode='unit',cut=true,explosion=0,gate=.72,flowOn=true,fieldOn=false;
   // 精细机组是对应厂房中那台设备的子装配，不搬去另一个展示坐标系。
   function select(bank,unit){bankIndex=bank;unitIndex=unit;covers[bank].children[unit].add(detailed);detailed.position.set(0,0,0);
     const sign=bank===0?1:-1;transformer.position.x=-102*sign;for(const part of context.children)if(/发电机出线|升压后送出/.test(part.name))part.scale.x=sign;
@@ -267,6 +344,7 @@ export function createPowerhouseModel(){
     if('cut'in options)cut=options.cut;if('explosion'in options)explosion=options.explosion;if('gate'in options)gate=Math.max(0,Math.min(1,options.gate));if('flow'in options)flowOn=options.flow;if('field'in options)fieldOn=options.field;
     housing.visible=!cut;outer.visible=!cut;frontGuide.visible=!cut;runnerCrown.visible=!cut;generator.position.y=explosion*15;rotor.position.y=explosion*24;top.position.y=explosion*34;axis.visible=explosion>0;
     flowGroup.visible=flowOn&&explosion===0;electricGroup.visible=flowOn&&explosion===0;fields.visible=fieldOn&&explosion===0;
+    poleFaces.forEach((pole,i)=>pole.material=fieldOn?(i%2?m.navy:m.red):m.steel);
     for(const g of gates){g.rotation.y=-g.userData.angle+Math.PI/2-gate*.9;g.visible=!cut||Math.sin(g.userData.angle)<=.4;}
     root.updateMatrixWorld(true);
   }
@@ -283,5 +361,5 @@ export function createPowerhouseModel(){
   function anchor(key){const v=V(...anchors[key]);if(key==='transformer')v.x=bankIndex===0?-102:102;if(['stator'].includes(key))v.y+=generator.position.y;if(key==='rotor')v.y+=rotor.position.y;if(['bearing','exciter'].includes(key))v.y+=top.position.y;return detailed.localToWorld(v);}
   function audit(){return {bankCount:2,unitsPerBank:8,totalUnits:16,selectedUnit:bankIndex*8+unitIndex+1,bankIndex,unitIndex,mode,gate,cut,explosion,runnerAngle:runner.rotation.y,shaftAngle:shaft.rotation.y,rotorAngle:rotor.rotation.y,statorAngle:generator.rotation.y,flowPaths:flowPaths.length};}
   select(0,0);configure();update(0);
-  return {root,halls,banks,detailed,select,setMode,configure,update,anchor,audit,get mode(){return mode;},get origin(){return detailed.getWorldPosition(new THREE.Vector3());}};
+  return {root,halls,banks,detailed,floorReflection,select,setMode,configure,update,anchor,audit,get mode(){return mode;},get origin(){return detailed.getWorldPosition(new THREE.Vector3());}};
 }
