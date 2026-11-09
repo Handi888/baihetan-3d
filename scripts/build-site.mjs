@@ -3,6 +3,7 @@ import {readdir,readFile,writeFile,mkdir,copyFile,lstat,rm,access} from 'node:fs
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {build,transform} from 'esbuild';
+import {createHash} from 'node:crypto';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const dist=path.resolve(root,'dist'),marker=path.join(dist,'.baihetan-generated');
 if(path.dirname(dist)!==root||path.basename(dist)!=='dist')throw new Error('Unsafe output directory');
@@ -33,9 +34,11 @@ await build({absWorkingDir:root,entryPoints:['src/main.js'],outfile:path.join(di
   bundle:true,format:'esm',platform:'browser',external:['three'],minify:true,target:'es2020',legalComments:'inline'});
 files.push('src/main.js');
 const entry=path.join(dist,'index.html');
-await writeFile(entry,(await readFile(entry,'utf8')).replace('</head>',
+// 内容版本使手机不会把新的 HTML 与缓存的旧场景入口混用。
+const version=createHash('sha256').update(await readFile(path.join(dist,'src/main.js'))).digest('hex').slice(0,16);
+await writeFile(entry,(await readFile(entry,'utf8')).replace('src="src/main.js"','src="./src/main.js?v='+version+'"').replace('</head>',
   '  <link rel="modulepreload" href="./vendor/three.module.js">\n'+
-  '  <link rel="modulepreload" href="./src/main.js">\n</head>'));
+  '  <link rel="modulepreload" href="./src/main.js?v='+version+'">\n</head>'));
 // 在线兼容入口永远相对于网站目录跳转，不请求访问者的 localhost。
 const alias='<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>白鹤滩三维场景</title><a href="./index.html">进入场景</a><script>location.replace("./index.html"+location.search+location.hash);</script></html>';
 for(const name of ['白鹤滩-坝库一体场景.html','白鹤滩-高精度场景.html']){await writeFile(path.join(dist,name),alias);files.push(name);}

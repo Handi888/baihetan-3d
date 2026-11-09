@@ -14,14 +14,20 @@ import {createDam} from './src/dam.js';
 import {createBuildings} from './src/buildings.js';
 import {createWater} from './src/water.js';
 import {createReservoirDistrict} from './src/reservoir-district.js';
-import {groundHeight,groundData} from './src/ground-surface.js';
+import {groundHeight,groundData,groundDataSteps,releaseGroundConstructionData} from './src/ground-surface.js';
+import {excavatedGroundSteps} from './src/rock-openings.js';
+import {runCooperatively} from './src/startup.js';
 import {mapLimits,withinMap} from './src/map-domain.js';
 import {originalTerrainHeight,terrainHeight,reservoirChannelX,makeOpenings,damPoint} from './src/math.js';
 import {retainingWallSpecs} from './src/bank-layout.js';
 import {PARAMS as P,PRESETS} from './src/config.js';
 import {writeFileSync} from 'node:fs';
 const report={passed:false,scenes:1,meshes:0,instances:0,renderTriangles:0,nonFinite:0,badNormals:0,degenerateTriangles:0,lod:0,water:[],channel:[],checks:[]};
-console.time('Build');const m=makeMaterials(),terrain=createTerrain(m),dam=createDam(m),buildings=createBuildings(m),water=createWater(),district=createReservoirDistrict(),scene=new THREE.Scene();
+console.time('Build');
+let browserTurns=0;const heartbeat=setInterval(()=>browserTurns++,0);
+await runCooperatively(groundDataSteps());const preparedRock=await runCooperatively(excavatedGroundSteps());
+clearInterval(heartbeat);assert(browserTurns>2,'Heavy geometry must yield to the browser during construction');
+const m=makeMaterials(),terrain=createTerrain(m,preparedRock),dam=createDam(m),buildings=createBuildings(m),water=createWater(),district=createReservoirDistrict(),scene=new THREE.Scene();
 scene.add(terrain,dam,buildings,water.group,district.group);scene.updateMatrixWorld(true);console.timeEnd('Build');
 const seen=new Set(),seenAttributes=new Set(),seenNormals=new Set();scene.traverse(o=>{
   if(o.isLOD)report.lod++;
@@ -80,6 +86,9 @@ for(const tower of shaftTowers){const center=tower.getWorldPosition(new THREE.Ve
 report.checks.push('Six raised bank shafts have actual thick walls and open recesses, not flat dark patches');
 for(const name of ['unified','reservoir','park','rockshore']){const [x,y,z]=PRESETS[name].eye;assert(y>groundHeight(x,z),'Preset must stay above ground: '+name);}
 report.vegetation=district.vegetation.group.userData;report.features=district.features.userData;report.channelSamples=report.channel.length;report.channelMinDepth=Math.min(...report.channel.map(p=>p.depth));delete report.channel;
+const samples=[[-300,0],[600,-200],[0,-1800],[-700,-5000],[1100,800]].map(([x,z])=>({x,z,y:groundHeight(x,z)}));
+releaseGroundConstructionData();for(const {x,z,y} of samples)assert.equal(groundHeight(x,z),y,'Walking/shore samples must survive construction-cache release');
+report.checks.push('Cooperative geometry yields to the browser; height queries stay exact after releasing construction data');
 report.passed=true;writeFileSync('docs/qa/UNIFIED_MODEL_AUDIT.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 `;
 const result=await build({stdin:{contents:source,resolveDir:root,sourcefile:'unified-audit-entry.js'},bundle:true,write:false,format:'esm',platform:'node',alias:{three:path.join(root,'vendor/three.module.js')}});

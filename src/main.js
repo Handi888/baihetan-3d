@@ -21,7 +21,11 @@ import {createWalkSelection} from './walk-selection.js';
 import {installTouchWalking} from './touch-walking.js';
 import {installPowerhouse} from './powerhouse.js';
 import {createSectionRenderer} from './section-renderer.js';
+import {groundDataSteps,releaseGroundConstructionData} from './ground-surface.js';
+import {excavatedGroundSteps} from './rock-openings.js';
+import {loadingStage,runCooperatively} from './startup.js';
 
+async function startScene(){
 const $=s=>document.querySelector(s),canvas=$('#scene');
 const errors=[];window.addEventListener('error',e=>errors.push(e.message));window.addEventListener('unhandledrejection',e=>errors.push(String(e.reason)));
 // 设备性能分级：移动端 / 低内存设备自动降负载，几何内容不做任何删减。
@@ -35,7 +39,8 @@ function detectTier(){
 const tier=detectTier();
 const reflectionSize=tier==='high'?768:512;
 let renderer;
-try{renderer=new THREE.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:true,powerPreference:'high-performance'});}
+// 截图前会同步重绘，不必让浏览器永久保留上一帧颜色缓冲。
+try{renderer=new THREE.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:false,powerPreference:'high-performance'});}
 catch(e){$('#loading').innerHTML='<strong>无法初始化 WebGL</strong><small>微信/QQ 内核过旧或未开启硬件加速，请点右上角“···”用系统浏览器打开，或升级 App</small>';throw e;}
 renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.02;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.debug.onShaderError=(gl,program,vs,fs)=>{const message=gl.getShaderInfoLog(fs)||gl.getProgramInfoLog(program);errors.push(message);console.error('Unified scene shader error:',message);};
@@ -52,9 +57,14 @@ document.addEventListener('visibilitychange',()=>{
 });
 const scene=new THREE.Scene(),materials=makeMaterials(),lighting=createEnvironment(scene,renderer),rig=createCamera(canvas);
 scene.fog.density=.00017;
-const terrain=createTerrain(materials),dam=createDam(materials),water=createWater();scene.add(terrain,dam,water.group);
-const district=createReservoirDistrict();scene.add(district.group);
-const buildings=createBuildings(materials);scene.add(buildings);
+await loadingStage('正在构建地形',()=>runCooperatively(groundDataSteps()));
+const preparedRock=await loadingStage('正在构建岩岸与洞口',()=>runCooperatively(excavatedGroundSteps()));
+const terrain=await loadingStage('正在构建边坡支护',()=>createTerrain(materials,preparedRock));
+const dam=await loadingStage('正在构建拱坝',()=>createDam(materials));
+const water=await loadingStage('正在构建完整水面',()=>createWater());scene.add(terrain,dam,water.group);
+const district=await loadingStage('正在布置库岸植被',()=>createReservoirDistrict());scene.add(district.group);
+const buildings=await loadingStage('正在构建工程设施',()=>createBuildings(materials));scene.add(buildings);
+releaseGroundConstructionData();
 // 本轮两张照片的总览没有前景输电束遮挡；保留旧版全部构件，按需显示。
 const powerlines=buildings.getObjectByName('Lattice transmission towers and sagging conductors');powerlines.visible=false;
 const creatures=createCreatures(groundHeight);scene.add(creatures.group);
@@ -147,13 +157,16 @@ $('#exit-walk').onclick=()=>walker.stop();
 powerhouse=installPowerhouse({scene,renderer,rig,canvas,dam,terrain,
   beforeEnter:()=>{walker.stop();},
   onExit:()=>{resize();reflections.invalidate();}});
-if(query.get('view')==='powerhouse')powerhouse.enter(['hall','unit'].includes(query.get('lesson'))?query.get('lesson'):'system');
+if(query.get('view')==='powerhouse')await loadingStage('正在构建地下厂房',()=>powerhouse.enter(['hall','unit'].includes(query.get('lesson'))?query.get('lesson'):'system'));
+await loadingStage('正在准备材质',()=>renderer.compileAsync(scene,rig.camera));
 let last=null,frame=0,frameSum=0,frameSamples=0;
 // 首帧从 RAF 自己的时间戳开始计时。模块微任务中构建机组时，RAF 时间戳可能
 // 早于脚本中的 performance.now()；负 dt 会令水路粒子的曲线参数越界。
 function animate(now){requestAnimationFrame(animate);const elapsed=last===null?0:Math.max(0,(now-last)/1000),dt=Math.min(.06,elapsed);last=now;if(!paused)time+=elapsed;
   if(powerhouse.active){
-    powerhouse.update(dt);sectionRenderer.render(rig.camera);frame++;
+    powerhouse.update(dt);
+    // 大厅是闭合室内视图，外景已隐藏；不用重复绘制山谷深度、水面与透明山体。
+    if(!powerhouse.renderHall())sectionRenderer.render(rig.camera);frame++;
   }else{
   if(walker.active)walker.update(dt);else rig.update(dt,paused);if(waterMoving)water.update(time);effects.update(paused?0:dt);canvas.dataset.discharge=JSON.stringify(effects.audit());
   if(inspectionCamera&&!walker.active){rig.camera.position.set(...inspectionCamera.eye);rig.controls.target.set(...inspectionCamera.target);rig.camera.lookAt(rig.controls.target);}
@@ -168,7 +181,7 @@ function animate(now){requestAnimationFrame(animate);const elapsed=last===null?0
   if(frame++%8===0)updateLabels();reflections.update(renderer,scene,rig.camera,now);occlusion.update(rig.camera);renderer.render(scene,rig.camera);
   }
   if(frame>15){frameSum+=elapsed;frameSamples++;if(frameSamples===60){canvas.dataset.frameMs=(frameSum*1000/frameSamples).toFixed(1);canvas.dataset.renderCalls=renderer.info.render.calls;canvas.dataset.renderTriangles=renderer.info.render.triangles;frameSum=frameSamples=0;}}
-  if(frame===3){renderer.shadowMap.autoUpdate=false;$('#loading').classList.add('ready');$('#loading').setAttribute('aria-hidden','true');window.__APP_READY__=true;clearTimeout(window.__baihetanWatchdog);}
+  if(frame===3){renderer.shadowMap.autoUpdate=false;$('#loading').classList.add('ready');$('#loading').setAttribute('aria-hidden','true');canvas.dataset.loadingStage='ready';canvas.dataset.readyMs=Math.round(performance.now());window.__APP_READY__=true;clearTimeout(window.__baihetanWatchdog);}
 }
 requestAnimationFrame(animate);
 // Explicit local QA API: application-owned state only, no browser internals required.
@@ -177,3 +190,5 @@ window.baihetan={params:P,scene,renderer,rig,water,dam,terrain,errors,setView,se
   stats(){return {arc,chord,damHeight:P.dam.height,triangles:renderer.info.render.triangles,drawCalls:renderer.info.render.calls,errors:[...errors]};},
   effects,buildings,reflections,district,creatures,walker,powerhouse,
 };
+}
+startScene().catch(error=>{console.error('Scene startup failed:',error);clearTimeout(window.__baihetanWatchdog);const loading=document.querySelector('#loading');loading.classList.remove('ready');loading.removeAttribute('aria-hidden');loading.innerHTML='<strong>场景加载未完成</strong><small>请刷新重试；若仍无法打开，可用系统浏览器访问。</small><button onclick="location.reload()">重新加载</button>';});

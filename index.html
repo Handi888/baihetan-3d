@@ -11,8 +11,8 @@
   window.__baihetanWatchdog=setTimeout(function(){
     if(window.__APP_READY__)return;
     var el=document.getElementById('loading');if(!el)return;
-    var ua=navigator.userAgent,old=/(CPU OS [0-9]|Android [0-7])\b/.test(ua);
-    el.innerHTML='<strong>三维场景加载超时</strong><small>'+(old?'当前系统版本过低，请升级微信/QQ或换用 Chrome 打开':'可能内存不足，请关闭后台网页后重试')+'</small><button onclick="location.reload()" style="margin-top:14px;padding:10px 22px;background:#304f40;color:#eff1d5;border:0;border-radius:3px">重新加载</button>';
+    var canvas=document.getElementById('scene'),stage=canvas&&canvas.dataset.loadingStage;
+    el.innerHTML='<strong>场景仍在加载</strong><small>'+(stage||'正在下载场景资源')+'，可以继续等待或刷新重试。</small><button onclick="location.reload()" style="margin-top:14px;padding:10px 22px;background:#304f40;color:#eff1d5;border:0;border-radius:3px">重新加载</button>';
   },90000);
   document.addEventListener('gesturestart',function(e){e.preventDefault();});
   document.addEventListener('gesturechange',function(e){e.preventDefault();});

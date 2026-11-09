@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile,readdir,lstat} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {createHash} from 'node:crypto';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../dist');
 const base=new URL('https://example.github.io/baihetan-3d/');
 let checked=0;const files=[];
@@ -12,7 +13,9 @@ await walk();
 const modules=files.filter(name=>name.endsWith('.js')).sort();
 assert.deepEqual(modules,['src/main.js','vendor/three.module.js'],'Unexpected runtime module files');
 const entryHTML=await readFile(path.join(root,'index.html'),'utf8');
-for(const name of modules)assert(entryHTML.includes('rel="modulepreload" href="./'+name+'"'),'Entry module not preloaded: '+name);
+const version=createHash('sha256').update(await readFile(path.join(root,'src/main.js'))).digest('hex').slice(0,16);
+for(const name of modules){const ref='./'+name+(name==='src/main.js'?'?v='+version:'');assert(entryHTML.includes('rel="modulepreload" href="'+ref+'"'),'Entry module not preloaded: '+name);}
+assert(entryHTML.includes('src="./src/main.js?v='+version+'"'),'Script and preload must use the same current content version');
 async function reference(ref,from='index.html'){
   if(/^(?:data:|#|https:\/\/)/.test(ref))return;
   assert(!/^(?:\/|file:|http:)/.test(ref),'Absolute local/root URL: '+from);

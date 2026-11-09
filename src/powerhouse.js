@@ -170,5 +170,16 @@ export function installPowerhouse({scene,renderer,rig,canvas,dam,terrain,beforeE
       syncAudit();
     }
   }
-  return {enter,exit,update,resize,get active(){return active;},get model(){return model;}};
+  const hallLocal=new THREE.Vector3();
+  function renderHall(){
+    if(!active||mode!=='hall')return false;
+    model.halls[bank].worldToLocal(hallLocal.copy(rig.camera.position));
+    // 只在封闭大厅内部省去被墙/地板完全遮住的室外绘制。移出大厅即恢复完整剖视。
+    if(Math.abs(hallLocal.x)>17.5||Math.abs(hallLocal.z)>205||hallLocal.y<28.4||hallLocal.y>63)return false;
+    const states=scene.children.map(o=>[o,o.visible]),shadows=renderer.shadowMap.enabled;
+    try{for(const [o] of states)o.visible=o===model.root||o===lightGroup;renderer.shadowMap.enabled=false;renderer.render(scene,rig.camera);}
+    finally{for(const [o,v] of states)o.visible=v;renderer.shadowMap.enabled=shadows;}
+    return true;
+  }
+  return {enter,exit,update,resize,renderHall,get active(){return active;},get model(){return model;}};
 }
