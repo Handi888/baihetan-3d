@@ -148,8 +148,10 @@ powerhouse=installPowerhouse({scene,renderer,rig,canvas,dam,terrain,
   beforeEnter:()=>{walker.stop();},
   onExit:()=>{resize();reflections.invalidate();}});
 if(query.get('view')==='powerhouse')powerhouse.enter(['hall','unit'].includes(query.get('lesson'))?query.get('lesson'):'system');
-let last=performance.now(),frame=0,frameSum=0,frameSamples=0;
-function animate(now){requestAnimationFrame(animate);const elapsed=(now-last)/1000,dt=Math.min(.06,elapsed);last=now;if(!paused)time+=elapsed;
+let last=null,frame=0,frameSum=0,frameSamples=0;
+// 首帧从 RAF 自己的时间戳开始计时。模块微任务中构建机组时，RAF 时间戳可能
+// 早于脚本中的 performance.now()；负 dt 会令水路粒子的曲线参数越界。
+function animate(now){requestAnimationFrame(animate);const elapsed=last===null?0:Math.max(0,(now-last)/1000),dt=Math.min(.06,elapsed);last=now;if(!paused)time+=elapsed;
   if(powerhouse.active){
     powerhouse.update(dt);sectionRenderer.render(rig.camera);frame++;
   }else{

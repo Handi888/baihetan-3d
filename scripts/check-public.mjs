@@ -8,6 +8,11 @@ const base=new URL('https://example.github.io/baihetan-3d/');
 let checked=0;const files=[];
 async function walk(dir=''){for(const entry of await readdir(path.join(root,dir),{withFileTypes:true})){const name=path.posix.join(dir,entry.name);assert(!entry.isSymbolicLink(),'No symlinks');if(entry.isDirectory())await walk(name);else files.push(name);}}
 await walk();
+// 发布入口应只请求合并后的场景代码与一份 Three.js，防止又退回数十层模块请求。
+const modules=files.filter(name=>name.endsWith('.js')).sort();
+assert.deepEqual(modules,['src/main.js','vendor/three.module.js'],'Unexpected runtime module files');
+const entryHTML=await readFile(path.join(root,'index.html'),'utf8');
+for(const name of modules)assert(entryHTML.includes('rel="modulepreload" href="./'+name+'"'),'Entry module not preloaded: '+name);
 async function reference(ref,from='index.html'){
   if(/^(?:data:|#|https:\/\/)/.test(ref))return;
   assert(!/^(?:\/|file:|http:)/.test(ref),'Absolute local/root URL: '+from);
@@ -29,4 +34,4 @@ for(const name of files){
 for(const f of ['creature.mesh','color.jpg','roughness.jpg','metallic.jpg'])await reference('assets/creature/runtime/'+f);
 assert((await lstat(path.join(root,'assets/creature/runtime/creature.mesh'))).size>400000,'Model must be complete');
 assert(!files.includes('assets/creature/runtime/model-info.json'),'Local source path must not be published');
-console.log(JSON.stringify({passed:true,files:files.length,references:checked,basePath:base.pathname,privateFilesExcluded:true}));
+console.log(JSON.stringify({passed:true,files:files.length,runtimeModules:modules.length,references:checked,basePath:base.pathname,privateFilesExcluded:true}));
