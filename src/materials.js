@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import {rockTextures} from './surface-textures.js';
+import {PARAMS as P} from './config.js';
+const UP=P.water.upstream.toFixed(1),DN=P.water.downstream.toFixed(1);
 // PBR base colour, roughness and world-space texture relief. No remote assets.
 export function proceduralMaterial(color,{rock=false,retaining=false,roughness=.87}={}){
   const m=new THREE.MeshStandardMaterial({color,roughness,metalness:0,side:THREE.DoubleSide});
@@ -27,8 +29,10 @@ export function proceduralMaterial(color,{rock=false,retaining=false,roughness=.
         float growth=smoothstep(.38,.76,vWorldNormal.y)*(.80+.14*noise3(p*.0021))*(1.-engineered*.98);
         // The reference banks have different exposed strata and mineral wash.
         // The colour transition follows the rock, never distorts the fixed geometry.
-        vec3 cutRock=mix(vec3(.56,.51,.46),vec3(.48,.51,.53),smoothstep(-160.,160.,p.x));
-        vec3 mineral=mix(vec3(.51,.46,.40),cutRock,engineered);
+        // 坝址为峨眉山玄武岩（含柱状节理），实景中开挖面与下游峡谷岩壁呈深灰、青灰色。
+        vec3 cutRock=mix(vec3(.45,.43,.41),vec3(.40,.42,.43),smoothstep(-160.,160.,p.x));
+        vec3 basalt=mix(vec3(.30,.30,.29),vec3(.38,.36,.33),macro);
+        vec3 mineral=mix(mix(vec3(.47,.43,.38),basalt,smoothstep(150.,600.,p.z)*(1.-smoothstep(380.,470.,p.y))),cutRock,engineered);
         mineral=mix(mineral,vec3(.09,.18,.065),growth*.94);
         float joints=1.-smoothstep(.014,.065,abs(noise3(vec3(p.x*.043,p.y*.11,p.z*.052))-.5));
         // Multiscale near-vertical seepage follows the excavation face. Pale
@@ -37,11 +41,11 @@ export function proceduralMaterial(color,{rock=false,retaining=false,roughness=.
         float wash=pow(noise3(vec3(p.x*.22,p.y*.014,p.z*.27)),4.);
         float bore=0.;
         vec3 weathered=mineral*(.70+tex*.65)*(1.+(macro-.5)*.12-(1.-streak)*engineered*.12-joints*.09-seepage*engineered*.45+wash*engineered*.3-bore*engineered*.05);
-        float waterline=mix(259.,24.,smoothstep(-180.,10.,p.z));
+        float waterline=mix(${UP},${DN},smoothstep(-180.,10.,p.z));
         float rockBeach=exp(-abs(p.y-waterline-1.8)/3.8);
         weathered=mix(weathered,vec3(.36,.25,.18)*(tex+.55),rockBeach*.68);
         // 上游由工程裸岩平滑过渡到植被、梯田与岩岸；仍用同一地形壳。
-        float district=smoothstep(1800.,3600.,-p.z),localY=p.y-259.;
+        float district=smoothstep(1800.,3600.,-p.z),localY=p.y-${UP};
         float fields=noise3(vec3(p.x*.013,localY*.001,p.z*.013))*.65+noise3(p*.031)*.35;
         float cliff=1.-smoothstep(.45,.78,vWorldNormal.y);
         vec3 grass=mix(vec3(.10,.19,.045),vec3(.19,.28,.08),fields);
@@ -84,11 +88,11 @@ export function proceduralMaterial(color,{rock=false,retaining=false,roughness=.
       normal=normalize(abs(determinant)*normal-sign(determinant)*(dFdx(relief)*rx+dFdy(relief)*ry));
     `);
   };
-  m.customProgramCacheKey=()=>rock?'angular-ridges-continuous-cover-v8':retaining?'square-formwork-wall-v2':'cast-concrete-weather-v4';return m;
+  m.customProgramCacheKey=()=>rock?'angular-ridges-basalt-v9':retaining?'square-formwork-wall-v2':'cast-concrete-weather-v4';return m;
 }
 export function makeMaterials(){return {
   concrete:proceduralMaterial(0xb3b9b4),damConcrete:proceduralMaterial(0x9fa9a5),darkConcrete:proceduralMaterial(0x7a8585),rock:proceduralMaterial(0xabb0ab,{rock:true}),
-  retaining:proceduralMaterial(0xadb1a5,{retaining:true,roughness:.9}),
+  retaining:proceduralMaterial(0x868b86,{retaining:true,roughness:.9}), // 实景支护为灰色喷混凝土/格构，不是亮白色
   asphalt:new THREE.MeshStandardMaterial({color:0x878f89,roughness:.94}),rail:new THREE.MeshStandardMaterial({color:0x9ca9a7,roughness:.48,metalness:.68}),
   gate:new THREE.MeshStandardMaterial({color:0x34464a,roughness:.68,metalness:.5,side:THREE.DoubleSide}),sealed:proceduralMaterial(0xa6afa4),
   red:new THREE.MeshStandardMaterial({color:0xbd251d,roughness:.48,metalness:.35}),glass:new THREE.MeshStandardMaterial({color:0x305060,roughness:.18,metalness:.35}),

@@ -80,7 +80,7 @@ fast.start();assert(!fast.pick(new THREE.Vector3(1.9,289,0)),'Reject spawn insid
 for(const code of ['ShiftLeft','ArrowRight'])window.emit('keydown',{code,preventDefault(){},stopImmediatePropagation(){}});
 fast.update(.5);assert(c2.position.x>1&&c2.position.x<1.53,'Fast movement stops before a thin wall');fast.stop();
 const c3=new THREE.PerspectiveCamera(),edgeWalker=createFirstPerson({canvas,rig:{camera:c3,controls,setOrbit(){}},roots:[],heightAt:()=>289,bounds:{minX:-2,maxX:2,minZ:-2,maxZ:2},onStart(){},onChange(){}});
-edgeWalker.start();assert(!edgeWalker.pick(new THREE.Vector3(3,289,0)),'Reject off-map ground spawn');assert(!edgeWalker.pick(new THREE.Vector3(0,259,-3),true),'Reject off-map water spawn');assert(edgeWalker.pick(new THREE.Vector3(0,289,0)));edgeWalker.confirm();
+edgeWalker.start();assert(!edgeWalker.pick(new THREE.Vector3(3,289,0)),'Reject off-map ground spawn');assert(!edgeWalker.pick(new THREE.Vector3(0,P.water.upstream,-3),true),'Reject off-map water spawn');assert(edgeWalker.pick(new THREE.Vector3(0,289,0)));edgeWalker.confirm();
 edgeWalker.setTouchKey('ArrowUp',true);edgeWalker.setTouchKey('ShiftLeft',true);edgeWalker.update(2);assert(c3.position.z>=-2&&c3.position.z< -1.8,'Long sprint cannot leave map');edgeWalker.stop();
 console.log(JSON.stringify({passed:true,crestFeet:crest,collisionCells:dw.cellCount,checks:['select then confirm','replace selected position','cancel selection','3x walk and sprint','four arrow directions','free mouse look','Shift-left freeze and seamless release','locked mouse look','fast thin-wall collision','unlock exit','four map boundaries','reject off-map ground and water spawns']}));
 `},outfile:out,bundle:true,platform:'node',format:'esm',alias:{three:path.join(root,'vendor/three.module.js')}});

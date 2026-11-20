@@ -94,10 +94,10 @@ function setQuality(q){quality=q;$('#quality').value=q;const size=P.quality[q].s
   for(const mat of changed)mat.needsUpdate=true;resize();
 }
 const labelDefs=[
-  {text:'坝顶弧长',small:'709 m',p:damPoint(-.52,306)},
-  {text:'双曲拱坝',small:'H ≈ 289 m',p:damPoint(.38,153,-1,-6)},
-  {text:'上游水库',small:'高水位',p:[-95,P.water.upstream+10,-510]},
-  {text:'下游河道',small:'低水位',p:[12,P.water.downstream+10,480]},
+  {text:'坝顶弧长',small:'709 m · 坝顶 834 m',p:damPoint(-.52,306)},
+  {text:'双曲拱坝',small:'最大坝高 289 m',p:damPoint(.38,153,-1,-6)},
+  {text:'上游水库',small:'正常蓄水位 825 m',p:[-95,P.water.upstream+10,-510]},
+  {text:'下游河道',small:'尾水约 570–600 m',p:[12,P.water.downstream+10,480]},
   {text:'深孔出口',small:'7 孔',p:damPoint(.06,218,-1,-8)},
 ];
 const labels=labelDefs.map(d=>{const el=document.createElement('div');el.className='label';el.innerHTML=d.text+'<small>'+d.small+'</small>';$('#labels').append(el);return {...d,el,v:new THREE.Vector3(...d.p)};});

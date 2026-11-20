@@ -72,7 +72,7 @@ for(const z of [-1000,-500,0,500,1000])assert(withinMap(-1000,z)&&withinMap(1000
 assert(!withinMap(3000,0),'Old east mountain must be outside the new map');
 assert(!withinMap(-3000,1000),'Old west mountain must be outside the new map');
 // 沿整个水道逐点检查水面包含湿区：收窄的是山脊外边界，不是岸线。
-for(let z=-7800;z<1700;z+=32){const limits=mapLimits(z,320);if(!limits)continue;for(let x=-3800;x<=3800;x+=32)if(terrainHeight(x,z)<(z<-200?259:24)-1)assert(x>limits.min+24&&x<limits.max-24,'Wet shore cannot approach outer water edge');}
+for(let z=-7800;z<1700;z+=32){const limits=mapLimits(z,320);if(!limits)continue;for(let x=-3800;x<=3800;x+=32)if(terrainHeight(x,z)<(z<-200?P.water.upstream:P.water.downstream)-1)assert(x>limits.min+24&&x<limits.max-24,'Wet shore cannot approach outer water edge');}
 report.checks.push('Compact river footprint; all wet shores remain inside the complete water sheets; outer ridges physically removed');
 for(let z=-1800;z>=-5050;z-=25){const x=reservoirChannelX(z),y=groundHeight(x,z);assert(y<P.water.upstream-15,'The connecting channel must stay submerged');report.channel.push({x,z,depth:P.water.upstream-y});}
 assert.equal(district.group.position.y,P.water.upstream);assert.equal(district.group.position.z,-5000);

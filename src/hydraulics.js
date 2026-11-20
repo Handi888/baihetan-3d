@@ -12,19 +12,19 @@ export function createHydraulics(m){
   const g=new THREE.Group();g.name='Intakes, hollow shafts, outlet basin and permanent operation plazas';const H=P.dam.height;
   for(const [bank,spec] of P.details.intakes.entries()){
     const {side,z,length}=spec,root=new THREE.Group();root.name=`${side} bank intake gallery`;g.add(root);
-    const {level}=intakeLayout(bank),front=[],back=[];
+    const {level,gates}=intakeLayout(bank),front=[],back=[],depth=level-gates[0].y+8;
     for(let i=0;i<=48;i++){const zz=z-length/2+length*i/48,x=groundShoreline(zz,P.water.upstream,side)-side*10;front.push([x-side*12,level,zz]);back.push([x+side*9,level,zz]);}
     ribbon(root,front,5.5,m.concrete).name='Intake front operation deck';ribbon(root,back,5,m.concrete).name='Intake rear deck';
     for(let i=0;i<=8;i++){
       const zz=z-length/2+length*i/8,x=groundShoreline(zz,P.water.upstream,side)-side*10;
-      box(root,m.concrete,[27,52,3.5],[x,level-26,zz]).name='Intake gate pier';box(root,m.concrete,[28,2,4.3],[x,level-1,zz]).name='Intake transverse deck';
+      box(root,m.concrete,[27,depth,3.5],[x,level-depth/2,zz]).name='Intake gate pier';box(root,m.concrete,[28,2,4.3],[x,level-1,zz]).name='Intake transverse deck';
       // 视频近景中的闸墩迎水鼻端为圆头，沿水面连续落到水下。
-      const nose=mesh(new THREE.CylinderGeometry(1.75,1.75,52,24),m.concrete,root);nose.position.set(x-side*13.5,level-26,zz);nose.name='Rounded intake pier nose';
+      const nose=mesh(new THREE.CylinderGeometry(1.75,1.75,depth,24),m.concrete,root);nose.position.set(x-side*13.5,level-depth/2,zz);nose.name='Rounded intake pier nose';
       if(i<8){
         const mid=zz+length/16,edge=groundShoreline(mid,P.water.upstream,side)-side*23;
-        box(root,m.recess,[.5,47,length/8-4],[edge+side*2,level-26,mid]).name='Recessed intake opening';
-        for(let j=0;j<10;j++){const dz=-(length/8-5)/2+(length/8-5)*j/9;member(root,m.rail,[edge,level-48,mid+dz],[edge,level-3,mid+dz],.18,.18,'Separate intake trash-rack bar');}
-        for(const y of [level-44,level-25,level-5])box(root,m.rail,[.4,.3,length/8-4],[edge-side*.1,y,mid]).name='Rack transverse member';
+        box(root,m.recess,[.5,depth-5,length/8-4],[edge+side*2,level-depth/2-1,mid]).name='Recessed intake opening';
+        for(let j=0;j<10;j++){const dz=-(length/8-5)/2+(length/8-5)*j/9;member(root,m.rail,[edge,level-depth+4,mid+dz],[edge,level-3,mid+dz],.18,.18,'Separate intake trash-rack bar');}
+        for(let y=level-depth+6;y<level-2;y+=14)box(root,m.rail,[.4,.3,length/8-4],[edge-side*.1,y,mid]).name='Rack transverse member';
       }
     }
     railPath(root,m.rail,front.filter((_,i)=>i%4===0));

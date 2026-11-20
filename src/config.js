@@ -1,15 +1,20 @@
-// Model metres, Y up; +Z downstream. Only height and crest arc length are scale anchors.
+// Model metres, Y up; +Z downstream. 高程基准：模型 y=0 对应建基面高程 545 m，
+// 因而 y = 实际高程 − 545（坝顶 834 m → 289，正常蓄水位 825 m → 280）。
+export const DATUM=545;
+export const elevation=y=>y+DATUM, modelY=elevation=>elevation-DATUM;
 export const PARAMS = {
   dam: {
     height: 289, crestArcLength: 709,
     halfAngle: 1.05, // radians: approximate horizontal curvature, NOT a surveyed angle
-    topThickness: 14, bottomThickness: 64,
+    topThickness: 14, bottomThickness: 72, // 公开资料：坝顶厚 14 m，拱冠梁底厚 72 m
     baseHalfWidth: 82, verticalLean: 100, verticalBow: 18,
     thicknessExponent: 1.45, spanExponent: 0.86,
     horizontalSegments: 360, verticalSegments: 144,
   },
   water: {
-    upstream: 259, downstream: 24, // relative to model base, NOT sea level; mesh follows terrain triangulation
+    upstream: 280, downstream: 24, // 正常蓄水位 825 m；下游取枯水期尾水约 569 m（下游溪洛渡低水位时）
+    // 真实特征水位（m）：用于讲解与运行参数计算，不改变网格。
+    levels: { normal: 825, dead: 765, floodLimit: 785, crest: 834, foundation: 545, tailwaterLow: 569, tailwaterHigh: 600 },
     // Visual approximation from water-detail-01.jpg; colours are sRGB inputs.
     appearance: {
       deepColor: '#0d6372', shallowColor: '#4b9180',

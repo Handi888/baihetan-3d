@@ -1,11 +1,17 @@
 import * as THREE from 'three';
 import {intakeLayout} from './intake-layout.js';
 import {groundShoreline} from './ground-surface.js';
+import {PARAMS as P} from './config.js';
 
 // 教学模型坐标沿用总场景：Y 向上、+Z 向下游。洞室位置/设备尺寸为示意，
 // 不是 BIM。两岸各 8 台的布置依据公开工程资料；详细机组只构建一份，按选择移动。
 export const UNIT_SPACING=48;
 export const BANK_CENTRES=[[-650,65,0],[650,65,0]];
+// 三大洞室平行布置（沿水流方向）：主厂房 → 主变洞 → 尾水调压室。
+export const TRANSFORMER_X=62,SURGE_X=132;
+// 水轮机部分整体按 0.84 缩放，使转轮直径约 8.6 m（左岸东方电气转轮 8.62 m）。
+export const TURBINE_SCALE=.84;
+const K=TURBINE_SCALE;
 export const UNIT_Z=Array.from({length:8},(_,i)=>-168+i*UNIT_SPACING);
 const V=(x,y,z)=>new THREE.Vector3(x,y,z);
 const TAU=Math.PI*2;
@@ -101,10 +107,10 @@ function spiralGeometry(top=false){
 }
 
 // 混流式转轮叶片：入口径向、出口轴向，叶片沿半径和高度双向扭转，并封闭厚度侧边。
-function runnerBlade(){
+function runnerBlade(extent=1){
   const p=[],idx=[],nu=16,nv=8;
   for(let side=0;side<2;side++)for(let u=0;u<=nu;u++)for(let v=0;v<=nv;v++){
-    const a=u/nu,b=v/nv,r=5.15-2.8*a,theta=.67*a+.24*b+.03*(side-.5);
+    const a=u/nu*extent,b=v/nv,r=5.15-2.8*a,theta=.67*a+.24*b+.03*(side-.5);
     const y=(5.15-2.9*a)*(1-b)+(3.4-3.0*a)*b;
     p.push(r*Math.cos(theta),y,r*Math.sin(theta));
   }
@@ -124,6 +130,7 @@ export function createPowerhouseModel(){
   m.glow=new THREE.MeshStandardMaterial({color:0xe8f7ff,emissive:0xcceaff,emissiveIntensity:2.2});
   m.water=new THREE.MeshStandardMaterial({color:0x45d9eb,metalness:.15,roughness:.25,transparent:true,opacity:.18,depthWrite:false,side:THREE.DoubleSide});
   m.pipe=new THREE.MeshStandardMaterial({color:0x68adc3,metalness:.6,roughness:.3,transparent:true,opacity:.24,depthWrite:false,side:THREE.DoubleSide});
+  m.cavern=new THREE.MeshStandardMaterial({color:0x8aa0a8,metalness:.1,roughness:.6,transparent:true,opacity:.2,depthWrite:false,side:THREE.DoubleSide});
   m.spiral=material(0x417e91,.63,.32);m.spiral.side=THREE.DoubleSide;
   const halls=[],systems=[],covers=[],banks=[];
   const floorReflection={uHallReflection:{value:null},uHallReflectionMatrix:{value:new THREE.Matrix4()},uHallReflectionReady:{value:0}};
@@ -163,25 +170,26 @@ export function createPowerhouseModel(){
       const localX=intakeX-BANK_CENTRES[bank][0];
       const inletY=intake.y-BANK_CENTRES[bank][1];
       // 竖井位于主厂房侧墙外，降至水轮机层以后再接入蜗壳，避免穿过发电机层走道。
-      const penstock=pipe(system,m.pipe,[[localX,inletY,intakeZ],[-side*48,inletY,intakeZ+24],[-side*48,80,z-28],[-side*48,5.2,z-28],[9.2,5.2,z-22],[9.2,5.2,z]],3.3,'单洞单机 · 引水上平洞与竖井');penstock.userData.intake=[intake.x,intake.y,intake.z];
-      pipe(system,m.pipe,[[0,2.4,z],[0,-3,z],[0,-7,z+2],[0,-11,z+8],[0,-11,z+22],[side*60,-18,z+28]],3.6,'尾水管与尾水支洞');
+      const penstock=pipe(system,m.pipe,[[localX,inletY,intakeZ],[-side*48,inletY,intakeZ+24],[-side*48,80,z-28],[-side*48,5.2*K,z-28],[9.2*K,5.2*K,z-22],[9.2*K,5.2*K,z]],3.3,'单洞单机 · 引水上平洞与竖井');penstock.userData.intake=[intake.x,intake.y,intake.z];
+      // 尾水管出口穿过主变洞下方岩体，进入两机共用的尾水调压室。
+      const pair=Math.floor(i/2),surgeZ=(UNIT_Z[pair*2]+UNIT_Z[pair*2+1])/2;
+      pipe(system,m.pipe,[[0,2.4,z],[0,-3,z],[0,-7,z+2],[0,-11,z+8],[0,-11,z+22],[side*40,-16,z+26],[side*(SURGE_X-30),-18,(z+26+surgeZ)/2],[side*(SURGE_X-20),-18,surgeZ]],3.6,'尾水管与尾水支洞');
       // 主变洞内的主变与母线。输电路径位于发电机侧，水流不经过这里。
-      box(system,m.dark,[9,9,10],[side*102,22,z],'主变压器');
-      for(let k=0;k<3;k++)pipe(system,[m.red,m.yellow,m.navy][k],[[7,22+k*.6,z],[side*55,22+k*.6,z],[side*102,28,z+k-1]],.32,'三相母线');
+      box(system,m.dark,[9,9,10],[side*TRANSFORMER_X,22,z],'主变压器');
+      for(let k=0;k<3;k++)pipe(system,[m.red,m.yellow,m.navy][k],[[7,22+k*.6,z],[side*30,22+k*.6,z],[side*(TRANSFORMER_X-6),27,z+k-1]],.32,'三相母线');
       for(const part of system.children.slice(systemStart))part.userData.unit=i;
     }
+    // 主变洞：与主厂房平行的第二大洞室，内设 8 台主变压器（24 kV → 500 kV）。
+    const cavern=box(system,m.cavern,[21,39,400],[side*TRANSFORMER_X,30,0],'主变洞');cavern.userData.unit=-1;
+    // 出线竖井：500 kV 电缆由主变洞升至地面出线场（GIS），再接入换流站。
+    const shaftTop=300-BANK_CENTRES[bank][1];
+    cylinder(system,m.cavern,6,shaftTop-48,[side*TRANSFORMER_X,(shaftTop+48)/2,-150],6,'500 kV 出线竖井').userData.unit=-1;
     for(let i=0;i<4;i++){
       const z=(UNIT_Z[i*2]+UNIT_Z[i*2+1])/2;
-      // 每两台汇入一个尾水调压室；下游分支合并关系作教学布局，不声称精确测绘。
-      cylinder(system,m.pipe,24,85,[side*60,21,z],24,'两机共用 · 尾水调压室');
-      for(const zz of [UNIT_Z[i*2]+28,UNIT_Z[i*2+1]+28])pipe(system,m.pipe,[[side*60,-18,zz],[side*60,-18,z]],4.2,'尾水汇流支管',8);
-      const trunk=bank===0?[0,1,1,2][i]:Math.floor(i/2),joinZ=340+trunk*75;
-      pipe(system,m.pipe,[[side*60,-18,z],[side*82,-20,z+50],[side*110,-29,joinZ]],6,'调压室至尾水干洞支线');
-    }
-    // 公开工程资料为左岸三条、右岸两条尾水隧洞；汇流位置仍为教学近似。
-    for(let i=0;i<(bank===0?3:2);i++){
-      const outZ=550+i*110,outX=groundShoreline(outZ,24,side)-BANK_CENTRES[bank][0];
-      pipe(system,m.pipe,[[side*110,-29,340+i*75],[side*100,-38,440+i*50],[outX,-42,outZ]],7,'尾水隧洞');
+      // 两机共用一个圆筒形尾水调压室，再接一条尾水隧洞（左右岸各 4 室 4 洞）。
+      cylinder(system,m.pipe,23,85,[side*SURGE_X,21,z],23,'两机共用 · 尾水调压室').userData.unit=-1;
+      const outZ=520+i*70,outX=groundShoreline(outZ,P.water.downstream,side)-BANK_CENTRES[bank][0];
+      pipe(system,m.pipe,[[side*SURGE_X,-20,z],[side*(SURGE_X+18),-26,z+90],[side*(SURGE_X+8),-34,(z+outZ)/2+60],[outX+side*40,-40,outZ-30],[outX,-42,outZ]],7,'尾水隧洞').userData.unit=-1;
     }
     for(const x of [-19,19]){
       box(hall,hallWall,[1.4,36,416],[x,46,0],'厂房纵墙');box(hall,m.dark,[1.6,1,416],[x-.8*Math.sign(x),57,0],'桥机轨道梁');
@@ -248,6 +256,10 @@ export function createPowerhouseModel(){
   instance(base,new THREE.BoxGeometry(1,1,1),m.steel,stays,'固定导叶 · 座环支柱');torus(base,m.yellow,6.45,.12,7.8,'导叶控制环');
   const frontGuide=instance(base,new THREE.BoxGeometry(1,1,1),m.steel,frontStays,'前半固定导叶 · 随剖视移除');
   const bladeGeo=runnerBlade();for(let i=0;i<15;i++){const b=mesh(runner,bladeGeo,m.steel,'双向扭曲的混流式转轮叶片');b.rotation.y=i*TAU/15;}
+  // 右岸哈电机组采用长短叶片转轮：长叶片之间各插一片只在进口段的短叶片，改善进口流态。
+  const splitter=group(runner,'长短叶片转轮 · 短叶片');const shortGeo=runnerBlade(.5);
+  for(let i=0;i<15;i++){const b=mesh(splitter,shortGeo,m.steel,'短叶片（仅进口段）');b.rotation.y=(i+.5)*TAU/15;}
+  base.scale.setScalar(K);runner.scale.setScalar(K);
   // 下环形成轴向出口；顶部轮毂与主轴刚性连接。
   ring(runner,m.steel,5.2,4.75,.35,3.25,Math.PI,Math.PI,'转轮下环 · 剖视');
   const crown=new THREE.LatheGeometry([[0,6.2],[1.3,6.2],[2.2,5.4],[3.5,5.15],[5.2,5.45],[5.2,5.1],[3.5,4.8],[2,2],[0,1.8]].map(p=>new THREE.Vector2(...p)),80);
@@ -261,9 +273,9 @@ export function createPowerhouseModel(){
   // 参考近景的定子绕组具有长直边与弯曲端部：用实际绝缘线棒束替代彩色大圆环。
   const loopPoints=[];for(let j=0;j<=12;j++){const a=j*Math.PI/12;loopPoints.push(V(.46*Math.cos(a),2.75+.46*Math.sin(a),0));}
   for(let j=0;j<=12;j++){const a=Math.PI+j*Math.PI/12;loopPoints.push(V(.46*Math.cos(a),-2.75+.46*Math.sin(a),0));}
-  const statorCoilGeo=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(loopPoints,true,'centripetal'),72,.10,8,true);
-  for(let i=0;i<36;i++){
-    const a=TAU*i/36;
+  const statorCoilGeo=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(loopPoints,true,"centripetal"),40,.10,6,true);
+  for(let i=0;i<72;i++){
+    const a=TAU*i/72;
     // 朝观察者的前 120° 留出剖口，可直接看见转子与气隙。
     if(Math.sin(a)>.55)continue;
     const bundle=group(generator,'定子三相绕组');bundle.position.set(8.55*Math.cos(a),21.3,8.55*Math.sin(a));bundle.rotation.y=Math.PI/2-a;
@@ -276,10 +288,12 @@ export function createPowerhouseModel(){
   cylinder(rotor,m.dark,2.25,6.3,[0,21.2,0],2.25,'转子中心体');
   ring(rotor,m.steel,7.6,6.8,5.2,18.7,0,TAU,'转子磁轭');
   const poleFaces=[];
-  for(let i=0;i<16;i++){
-    const a=i*TAU/16;rod(rotor,m.steel,[1.5*Math.cos(a),21.2,1.5*Math.sin(a)],[7*Math.cos(a),21.2,7*Math.sin(a)],.3,'转子支臂');
-    const pole=box(rotor,m.steel,[1.65,4.8,.46],[7.8*Math.cos(a),21.2,7.8*Math.sin(a)],i%2?'转子 S 磁极（示意）':'转子 N 磁极（示意）');pole.rotation.y=Math.PI/2-a;poleFaces.push(pole);
-    const winding=mesh(rotor,coilGeo,m.copper,'磁极励磁绕组',[7.55*Math.cos(a),21.2,7.55*Math.sin(a)]);winding.rotation.y=Math.PI/2-a;winding.scale.set(.7,2.5,1);
+  for(let i=0;i<8;i++){const a=i*TAU/8;rod(rotor,m.steel,[1.5*Math.cos(a),21.2,1.5*Math.sin(a)],[6.8*Math.cos(a),21.2,6.8*Math.sin(a)],.3,'转子支臂');}
+  // 54 个磁极 = 27 对极：f = 27 × 111.1 r/min ÷ 60 ≈ 50 Hz。N/S 交替排列。
+  for(let i=0;i<54;i++){
+    const a=i*TAU/54;
+    const pole=box(rotor,m.steel,[.6,4.8,.62],[7.95*Math.cos(a),21.2,7.95*Math.sin(a)],i%2?'转子 S 磁极':'转子 N 磁极');pole.rotation.y=Math.PI/2-a;poleFaces.push(pole);
+    const winding=mesh(rotor,coilGeo,m.copper,'磁极励磁绕组',[7.55*Math.cos(a),21.2,7.55*Math.sin(a)]);winding.rotation.y=Math.PI/2-a;winding.scale.set(.42,2.45,1.3);
   }
   ring(top,m.dark,3.1,1.15,1.4,26,0,TAU,'推力轴承');for(let i=0;i<8;i++){const a=i*TAU/8;rod(top,m.steel,[3*Math.cos(a),26.5,3*Math.sin(a)],[9.4*Math.cos(a),26.5,9.4*Math.sin(a)],.22,'上机架径向支臂');}
   cylinder(top,m.blue,2.6,1.6,[0,29.1,0],2.6,'励磁机罩');cylinder(top,m.steel,1.4,1.5,[0,30.6,0],1.4,'励磁机');
@@ -289,27 +303,30 @@ export function createPowerhouseModel(){
   const draftPts=[[0,2.4,0],[0,-3,0],[0,-7,2],[0,-11,8],[0,-11,22]];
   pipe(context,m.pipe,draftPts,3.6,'轴向出流 · 弯肘尾水管');
   const cone=mesh(context,new THREE.CylinderGeometry(2.7,4.2,7,64,1,true),m.pipe,'尾水扩散锥管',[0,-1.4,0]);
-  const inletPts=[[9.2,31,-24],[9.2,20,-24],[9.2,7,-19],[9.2,5.2,-10],[9.2,5.2,0]];
+  const inletPts=[[9.2,31,-24],[9.2,20,-24],[9.2,7,-19],[9.2,5.2,-10],[9.2,5.2,0]].map(([x,y,z])=>[x*K,y<8?y*K:y,z]);
   pipe(context,m.pipe,inletPts,3.55,'压力管道 · 展示段');
-  for(const z of [-19,-12,-4]){const flange=mesh(context,new THREE.TorusGeometry(3.6,.1,8,48),m.steel,'压力钢管环焊缝',[9.2,z===-19?7:5.2,z]);}
-  const transformer=group(context,'主变压器与电能输出');transformer.position.set(-102,0,0);
+  for(const z of [-19,-12,-4]){const flange=mesh(context,new THREE.TorusGeometry(3.6,.1,8,48),m.steel,'压力钢管环焊缝',[9.2*K,(z===-19?7:5.2)*K,z]);flange.scale.setScalar(K);}
+  const transformer=group(context,'主变压器与电能输出');transformer.position.set(-TRANSFORMER_X,0,0);
   box(transformer,m.dark,[6,8,7],[0,18,0],'变压器油箱');for(const x of [-3.3,3.3])for(let z=-3;z<=3;z+=.5)box(transformer,m.steel,[1.3,6,.12],[x,18,z],'散热片');
   for(let i=0;i<3;i++){cylinder(transformer,m.white,.28,3,[i*1.7-1.7,23,0],.2,'高压套管');for(let y=22;y<24.4;y+=.3)torus(transformer,m.white,.4,.07,y).position.x=i*1.7-1.7;}
   const electricalPaths=[];for(let i=0;i<3;i++){
-    const pts=[[-8,20+i*.6,-2],[-33,20+i*.6,-2],[-75,23,-2],[-103.7+i*1.7,24.5,0]];
+    const pts=[[-8,20+i*.6,-2],[-22,20+i*.6,-2],[-45,23,-2],[-TRANSFORMER_X-1.7+i*1.7,24.5,0]];
     electricalPaths.push(path(pts));pipe(context,phaseM[i],pts,.16,'发电机出线 · 三相母线');
-    pipe(context,phaseM[i],[[-103.7+i*1.7,24.5,0],[-103.7+i*1.7,27,0],[-132,27,i*1.2]],.13,'升压后送出');
+    pipe(context,phaseM[i],[[-TRANSFORMER_X-1.7+i*1.7,24.5,0],[-TRANSFORMER_X-1.7+i*1.7,32,0],[-TRANSFORMER_X-1.7+i*1.7,44,-8],[-TRANSFORMER_X-1.7+i*1.2,60,-20]],.13,'升压后送出');
   }
   // 水流粒子逐段连续：进口 -> 蜗壳 -> 导叶 -> 转轮 -> 尾水；没有流经发电机的假动画。
   const flowPaths=[path(inletPts)];
   for(let branch=0;branch<6;branch++){
     const a=.55+branch*.73,pts=[];
     for(let j=0;j<=36;j++){const t=j/36,angle=a*t;pts.push([9.2*Math.cos(angle),5.15,9.2*Math.sin(angle)]);}
-    pts.push([6.4*Math.cos(a+.12),5,6.4*Math.sin(a+.12)],[4.6*Math.cos(a+.3),4.4,4.6*Math.sin(a+.3)],[2*Math.cos(a+.6),1,2*Math.sin(a+.6)],[0,-3,0],[0,-7,2],[0,-11,8],[0,-11,22]);flowPaths.push(path(pts));
+    pts.push([6.4*Math.cos(a+.12),5,6.4*Math.sin(a+.12)],[4.6*Math.cos(a+.3),4.4,4.6*Math.sin(a+.3)],[2*Math.cos(a+.6),1,2*Math.sin(a+.6)]);
+    for(const q of pts){q[0]*=K;q[1]*=K;q[2]*=K;}
+    pts.push([0,-3,0],[0,-7,2],[0,-11,8],[0,-11,22]);flowPaths.push(path(pts));
   }
   const flowGroup=group(detailed,'水流方向粒子'),electricGroup=group(detailed,'电能输出脉冲'),fields=group(rotor,'随磁极旋转的磁场示意');
-  for(let i=0;i<4;i++){
-    const a=i*Math.PI/2,pts=[];for(let j=0;j<=40;j++){const t=j/40,r=7.8+1.35*Math.sin(Math.PI*t);pts.push([r*Math.cos(a+.33*t),21.2,r*Math.sin(a+.33*t)]);}line(fields,pts,i%2?0x6aa8ff:0xff8b74,'磁场跨过气隙');
+  // 磁力线从 N 极出发，穿过约 3 cm 的气隙进入定子铁芯，再回到相邻 S 极（示意，气隙放大显示）。
+  for(let i=0;i<54;i+=2){
+    const a=i*TAU/54,step=TAU/54,pts=[];for(let j=0;j<=24;j++){const t=j/24,r=8.25+1.1*Math.sin(Math.PI*t);pts.push([r*Math.cos(a+step*t),21.2,r*Math.sin(a+step*t)]);}line(fields,pts,0xff8b74,'磁场跨过气隙');
   }
   const flowMat=new THREE.MeshBasicMaterial({color:0x78edff}),energyMat=new THREE.MeshBasicMaterial({color:0xffd989});
   const flow=new THREE.InstancedMesh(new THREE.SphereGeometry(.18,7,5),flowMat,210);flow.name='水流粒子';flowGroup.add(flow);flow.frustumCulled=false;
@@ -317,10 +334,10 @@ export function createPowerhouseModel(){
   const axis=line(detailed,[[0,-12,0],[0,65,0]],0x587786,'分解参考轴');axis.visible=false;
   const sectionPlane=new THREE.Plane(V(0,0,-1),0),hallMaterialCopies=new Map();
   for(const hall of halls)hall.traverse(o=>{if(!o.isMesh)return;const source=o.material;if(!hallMaterialCopies.has(source)){const copy=source.clone();copy.onBeforeCompile=source.onBeforeCompile;copy.customProgramCacheKey=source.customProgramCacheKey;hallMaterialCopies.set(source,copy);}o.material=hallMaterialCopies.get(source);});
-  const dummy=new THREE.Object3D();let time=0,angle=0,bankIndex=0,unitIndex=0,mode='unit',cut=true,explosion=0,gate=.72,flowOn=true,fieldOn=false;
+  const dummy=new THREE.Object3D();let time=0,flowPhase=0,energyPhase=0,angle=0,bankIndex=0,unitIndex=0,mode='unit',cut=true,explosion=0,gate=.72,flowOn=true,fieldOn=false;
   // 精细机组是对应厂房中那台设备的子装配，不搬去另一个展示坐标系。
   function select(bank,unit){bankIndex=bank;unitIndex=unit;covers[bank].children[unit].add(detailed);detailed.position.set(0,0,0);
-    const sign=bank===0?1:-1;transformer.position.x=-102*sign;for(const part of context.children)if(/发电机出线|升压后送出/.test(part.name))part.scale.x=sign;
+    const sign=bank===0?1:-1;transformer.position.x=-TRANSFORMER_X*sign;splitter.visible=bank===1;for(const part of context.children)if(/发电机出线|升压后送出/.test(part.name))part.scale.x=sign;
     applyMode();}
   function applyMode(){
     sectionPlane.constant=UNIT_Z[unitIndex]+1;
@@ -333,7 +350,7 @@ export function createPowerhouseModel(){
       }
       for(const part of systems[i].children){const selected=i===bankIndex&&part.userData.unit===unitIndex;
         const replaced=/发电机外壳|立轴|主变压器|三相母线/.test(part.name)||part.geometry?.type==='TorusGeometry';
-        part.visible=mode!=='unit'||(i===bankIndex&&selected&&!replaced);
+        part.visible=mode!=='unit'||(i===bankIndex&&selected&&!replaced)||(i===bankIndex&&part.name==='主变洞');
       }
     });
     for(const name of ['压力管道 · 展示段','轴向出流 · 弯肘尾水管','尾水扩散锥管'])context.getObjectByName(name).visible=false;
@@ -348,18 +365,19 @@ export function createPowerhouseModel(){
     for(const g of gates){g.rotation.y=-g.userData.angle+Math.PI/2-gate*.9;g.visible=!cut||Math.sin(g.userData.angle)<=.4;}
     root.updateMatrixWorld(true);
   }
-  function update(dt,running=true){
-    if(running){time+=dt;if(gate>.001)angle+=dt*.65;} // 同步机并网时转速稳定；导叶开度只改变流量/负荷，非任意调转速。
+  // omega：显示用角速度（rad/s，已含慢放倍率）；flowRate/powerRate：0..1 归一化的流量和电功率。
+  function update(dt,running=true,{omega=.65,flowRate=gate,powerRate=gate}={}){
+    if(running){time+=dt;angle+=dt*omega;flowPhase+=dt*.11*flowRate;energyPhase+=dt*.25*powerRate;} // 并网后转速由电网频率锁定；导叶开度只改变流量与出力。
     runner.rotation.y=shaft.rotation.y=rotor.rotation.y=angle;
     for(let i=0;i<flow.count;i++){
-      const curve=flowPaths[i%flowPaths.length],t=(i/flow.count+time*.085*gate)%1;dummy.position.copy(curve.getPointAt(t));dummy.scale.setScalar(gate>.001?1:0);dummy.updateMatrix();flow.setMatrixAt(i,dummy.matrix);
+      const curve=flowPaths[i%flowPaths.length],t=(i/flow.count+flowPhase)%1;dummy.position.copy(curve.getPointAt(t));dummy.scale.setScalar(flowRate>.001?1:0);dummy.updateMatrix();flow.setMatrixAt(i,dummy.matrix);
     }
-    for(let i=0;i<energy.count;i++){dummy.position.copy(electricalPaths[i%3].getPointAt((i/energy.count+time*.18)%1));dummy.position.x*=bankIndex===0?1:-1;dummy.scale.setScalar(gate>.001?1:0);dummy.updateMatrix();energy.setMatrixAt(i,dummy.matrix);}
+    for(let i=0;i<energy.count;i++){dummy.position.copy(electricalPaths[i%3].getPointAt((i/energy.count+energyPhase)%1));dummy.position.x*=bankIndex===0?1:-1;dummy.scale.setScalar(powerRate>.001?1:0);dummy.updateMatrix();energy.setMatrixAt(i,dummy.matrix);}
     flow.instanceMatrix.needsUpdate=true;energy.instanceMatrix.needsUpdate=true;detailed.updateMatrixWorld(true);
   }
-  const anchors={intake:[9.2,27,-24],spiral:[11.3,5,3],gate:[6.45,6.4,0],runner:[3.5,3.2,3],shaft:[0,13.6,0],rotor:[7.8,21.3,1],stator:[-8,22,0],bearing:[0,26.5,0],exciter:[0,31.5,0],draft:[0,-11,17],transformer:[-22,23,0]};
-  function anchor(key){const v=V(...anchors[key]);if(key==='transformer')v.x=bankIndex===0?-102:102;if(['stator'].includes(key))v.y+=generator.position.y;if(key==='rotor')v.y+=rotor.position.y;if(['bearing','exciter'].includes(key))v.y+=top.position.y;return detailed.localToWorld(v);}
-  function audit(){return {bankCount:2,unitsPerBank:8,totalUnits:16,selectedUnit:bankIndex*8+unitIndex+1,bankIndex,unitIndex,mode,gate,cut,explosion,runnerAngle:runner.rotation.y,shaftAngle:shaft.rotation.y,rotorAngle:rotor.rotation.y,statorAngle:generator.rotation.y,flowPaths:flowPaths.length};}
+  const anchors={intake:[9.2*K,27,-24],spiral:[11.3,5,3],gate:[6.45,6.4,0],runner:[3.5,3.2,3],shaft:[0,13.6,0],rotor:[7.8,21.3,1],stator:[-8,22,0],bearing:[0,26.5,0],exciter:[0,31.5,0],draft:[0,-11,17],transformer:[-22,23,0]};
+  function anchor(key){const v=V(...anchors[key]);if(key==='transformer')v.x=bankIndex===0?-TRANSFORMER_X:TRANSFORMER_X;if(['spiral','gate','runner','intake'].includes(key)&&key!=='intake'){v.x*=K;v.y*=K;v.z*=K;}if(['stator'].includes(key))v.y+=generator.position.y;if(key==='rotor')v.y+=rotor.position.y;if(['bearing','exciter'].includes(key))v.y+=top.position.y;return detailed.localToWorld(v);}
+  function audit(){return {bankCount:2,unitsPerBank:8,totalUnits:16,selectedUnit:bankIndex*8+unitIndex+1,bankIndex,unitIndex,mode,gate,cut,explosion,runnerAngle:runner.rotation.y,shaftAngle:shaft.rotation.y,rotorAngle:rotor.rotation.y,statorAngle:generator.rotation.y,flowPaths:flowPaths.length,poles:poleFaces.length,splitterBlades:splitter.visible?splitter.children.length:0,turbineScale:K};}
   select(0,0);configure();update(0);
   return {root,halls,banks,detailed,floorReflection,select,setMode,configure,update,anchor,audit,get mode(){return mode;},get origin(){return detailed.getWorldPosition(new THREE.Vector3());}};
 }

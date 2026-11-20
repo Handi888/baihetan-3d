@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {faceZ} from './math.js';
+import {PARAMS as P} from './config.js';
 import {createWalkWorld} from './walk-world.js';
 
 export function createFirstPerson({canvas,rig,roots,heightAt,bounds=null,onStart,onChange}){
@@ -77,7 +78,7 @@ export function createFirstPerson({canvas,rig,roots,heightAt,bounds=null,onStart
         r=Number(pressed('ArrowRight')||pressed('KeyD'))-Number(pressed('ArrowLeft')||pressed('KeyA')),len=Math.hypot(f,r)||1;
       const dx=(-Math.sin(yaw)*f+Math.cos(yaw)*r)/len*speed*h,dz=(-Math.cos(yaw)*f-Math.sin(yaw)*r)/len*speed*h,feet=p.y-eye;
       if(!world.blocked(p.x+dx,p.z,feet))p.x+=dx;if(!world.blocked(p.x,p.z+dz,feet))p.z+=dz;
-      const floor=world.floor(p.x,p.z,feet+.48),level=p.z<faceZ(p.x,259,0)?259:24;
+      const floor=world.floor(p.x,p.z,feet+.48),level=p.z<faceZ(p.x,P.water.upstream,0)?P.water.upstream:P.water.downstream;
       const swimming=floor<level-1.2&&feet<level-.7;
       if(swimming){vy+=(level+.45-p.y)*6*h;vy*=Math.exp(-4*h);if(pressed('Space'))vy=2;if(pressed('ControlLeft'))vy=-2;grounded=false;}
       else vy-=24*h;

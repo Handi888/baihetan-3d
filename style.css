@@ -173,3 +173,29 @@ body.powerhouse .ui, body.powerhouse #clean-view,body.powerhouse #labels,body.po
 @media(min-width:851px){.ph-panel{bottom:auto;max-height:calc(100vh - 180px)}.ph-bottom{right:auto}}
 #powerhouse-ui .ph-exit{background:#193b46ed;color:#eef5f0;border-color:#587880}
 .ph-heading p{display:inline-block;background:#173845df;color:#e3eeeb;padding:5px 9px;border-radius:3px}
+/* 讲解文本、关键数据与实时运行工况。 */
+#ph-description{font-size:12.5px;line-height:1.9;color:#bdd0d8;margin:0 0 14px}
+.ph-facts{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 16px}
+.ph-facts div{background:#0d212cb0;border:1px solid #29434f;border-radius:4px;padding:6px 8px}
+.ph-facts dt{font-size:9.5px;color:#7fa0ae;letter-spacing:.5px}.ph-facts dd{margin:3px 0 0;font-size:12px;color:#e7f2f3;font-variant-numeric:tabular-nums}
+#powerhouse-ui .ph-step-nav button{flex:1}
+.ph-dash{position:absolute;left:32px;top:198px;width:300px;max-height:calc(100vh - 290px);overflow-y:auto;padding:14px 16px;background:linear-gradient(145deg,#192f3bed,#0e202de8);border:1px solid #2a4655;border-radius:9px;box-shadow:0 18px 70px #0003;pointer-events:auto;scrollbar-width:thin}
+.ph-dash .ph-range{margin-top:8px}.ph-dash .ph-range input{margin:7px 0 4px}
+.ph-dash-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;letter-spacing:1px;color:#e5f0f2}
+.ph-state{font-size:11px;padding:3px 8px;border-radius:10px;background:#1f5d4a;color:#d6f7e6}
+.ph-state[data-state=over]{background:#7a4b19;color:#ffe2b8}.ph-state[data-state=no-load]{background:#5a5320;color:#f5edb8}.ph-state[data-state=stopped]{background:#4a2f35;color:#f3d5d9}
+.ph-metrics{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin:10px 0}
+.ph-metrics div{background:#0c1f29b8;border-radius:4px;padding:6px 8px}.ph-metrics small{display:block;font-size:9.5px;color:#7fa0ae}
+.ph-metrics b{display:block;font-weight:500;font-size:13px;margin-top:2px;color:#e7f2f3;font-variant-numeric:tabular-nums}
+.ph-metrics .power b{color:#ffd989;font-size:15px}
+.ph-chain #ph-chain-bar{display:flex;height:9px;border-radius:5px;overflow:hidden;background:#0c1f29}
+.ph-chain i{display:block;height:100%}.ph-chain .grid{background:#f3c25c}.ph-chain .loss-pipe{background:#5ea9c4}.ph-chain .loss-turbine{background:#9bb5bf}.ph-chain .loss-electric{background:#c46a5a}
+.ph-chain small,.ph-wave small,.ph-speed-note{display:block;font-size:10px;line-height:1.6;color:#86a5b2;margin-top:5px}
+.ph-wave{margin-top:10px}.ph-wave canvas{display:block;width:100%;height:60px;background:#0a1a23;border-radius:4px}
+.ph-operation{font-size:11px;line-height:1.7;color:#cfe1e6;margin:10px 0 4px;padding:7px 9px;border-left:2px solid #8edfea;background:#0c1f2990}
+@media(max-width:850px){
+ .ph-dash{left:12px;right:12px;top:156px;width:auto;max-height:150px;padding:10px 12px}
+ .ph-dash .ph-metrics{grid-template-columns:repeat(3,1fr)}.ph-dash .ph-metrics b{font-size:11px}
+ .ph-dash .ph-wave,.ph-dash .ph-chain,.ph-dash .ph-speed-note{display:none}
+ .ph-facts dd{font-size:11px}
+}
