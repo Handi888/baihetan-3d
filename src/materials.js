@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import {rockTextures} from './surface-textures.js';
+import {PARAMS as P} from './config.js';
+const UP=P.water.upstream.toFixed(1),DN=P.water.downstream.toFixed(1);
 // PBR base colour, roughness and world-space texture relief. No remote assets.
 export function proceduralMaterial(color,{rock=false,retaining=false,roughness=.87}={}){
   const m=new THREE.MeshStandardMaterial({color,roughness,metalness:0,side:THREE.DoubleSide});
@@ -23,13 +25,20 @@ export function proceduralMaterial(color,{rock=false,retaining=false,roughness=.
         relief=texture2D(rockRelief,q.zy*.037).r*w.x+texture2D(rockRelief,q.xz*.037).r*w.y+texture2D(rockRelief,q.xy*.037).r*w.z;
         float macro=noise3(p*.017),streak=noise3(vec3(p.x*.36,p.y*.008,p.z*.31));
         float engineered=(1.-smoothstep(500.,920.,abs(p.z)))*(1.-smoothstep(400.,470.,p.y));
+        // 颜色过渡更利落：开挖区内为米黄喷混凝土，区外迅速转为红褐碎石与林地。
+        float engColor=smoothstep(.55,.95,engineered);
         // 植被连续覆盖缓坡，陡壁露出岩石；不把高对比噪声铺成均匀的鼓包花纹。
-        float growth=smoothstep(.38,.76,vWorldNormal.y)*(.80+.14*noise3(p*.0021))*(1.-engineered*.98);
+        float growth=smoothstep(.16,.5,vWorldNormal.y)*(.86+.14*noise3(p*.0021))*(1.-engColor*.98);
+        // 开挖顶缘外 40 m 左右的红褐色碎石带，林缘不规则。
+        float scree=(1.-engColor)*(1.-smoothstep(500.,1000.,abs(p.z)))*smoothstep(380.,430.,p.y)*(1.-smoothstep(452.,478.+30.*noise3(p*.02),p.y));
+        growth*=1.-scree*.9;
         // The reference banks have different exposed strata and mineral wash.
         // The colour transition follows the rock, never distorts the fixed geometry.
-        vec3 cutRock=mix(vec3(.56,.51,.46),vec3(.48,.51,.53),smoothstep(-160.,160.,p.x));
-        vec3 mineral=mix(vec3(.51,.46,.40),cutRock,engineered);
-        mineral=mix(mineral,vec3(.09,.18,.065),growth*.94);
+        // 开挖面覆盖米黄色喷混凝土；开挖边缘与下游岸坡为红褐色碎石、裸岩（参照官方渲染）。
+        vec3 cutRock=mix(vec3(.66,.60,.50),vec3(.62,.58,.50),smoothstep(-160.,160.,p.x));
+        vec3 basalt=mix(vec3(.42,.29,.21),vec3(.55,.40,.30),macro);
+        vec3 mineral=mix(mix(vec3(.47,.31,.22),basalt,smoothstep(150.,600.,p.z)*(1.-smoothstep(380.,470.,p.y))),cutRock,engColor);
+        mineral=mix(mineral,vec3(.055,.13,.04),growth*.96);
         float joints=1.-smoothstep(.014,.065,abs(noise3(vec3(p.x*.043,p.y*.11,p.z*.052))-.5));
         // Multiscale near-vertical seepage follows the excavation face. Pale
         // mineral wash and dark wet tracks are both visible in all four photos.
@@ -37,11 +46,11 @@ export function proceduralMaterial(color,{rock=false,retaining=false,roughness=.
         float wash=pow(noise3(vec3(p.x*.22,p.y*.014,p.z*.27)),4.);
         float bore=0.;
         vec3 weathered=mineral*(.70+tex*.65)*(1.+(macro-.5)*.12-(1.-streak)*engineered*.12-joints*.09-seepage*engineered*.45+wash*engineered*.3-bore*engineered*.05);
-        float waterline=mix(259.,24.,smoothstep(-180.,10.,p.z));
+        float waterline=mix(${UP},${DN},smoothstep(-180.,10.,p.z));
         float rockBeach=exp(-abs(p.y-waterline-1.8)/3.8);
         weathered=mix(weathered,vec3(.36,.25,.18)*(tex+.55),rockBeach*.68);
         // 上游由工程裸岩平滑过渡到植被、梯田与岩岸；仍用同一地形壳。
-        float district=smoothstep(1800.,3600.,-p.z),localY=p.y-259.;
+        float district=smoothstep(1800.,3600.,-p.z),localY=p.y-${UP};
         float fields=noise3(vec3(p.x*.013,localY*.001,p.z*.013))*.65+noise3(p*.031)*.35;
         float cliff=1.-smoothstep(.45,.78,vWorldNormal.y);
         vec3 grass=mix(vec3(.10,.19,.045),vec3(.19,.28,.08),fields);
@@ -84,11 +93,12 @@ export function proceduralMaterial(color,{rock=false,retaining=false,roughness=.
       normal=normalize(abs(determinant)*normal-sign(determinant)*(dFdx(relief)*rx+dFdy(relief)*ry));
     `);
   };
-  m.customProgramCacheKey=()=>rock?'angular-ridges-continuous-cover-v8':retaining?'square-formwork-wall-v2':'cast-concrete-weather-v4';return m;
+  m.customProgramCacheKey=()=>rock?'angular-ridges-ctg-v10':retaining?'square-formwork-wall-v3':'cast-concrete-weather-v4';return m;
 }
 export function makeMaterials(){return {
-  concrete:proceduralMaterial(0xb3b9b4),damConcrete:proceduralMaterial(0x9fa9a5),darkConcrete:proceduralMaterial(0x7a8585),rock:proceduralMaterial(0xabb0ab,{rock:true}),
-  retaining:proceduralMaterial(0xadb1a5,{retaining:true,roughness:.9}),
+  // 参照三峡官方渲染：坝体与边坡喷混凝土为暖米黄色，马道略浅、低对比。
+  concrete:proceduralMaterial(0xcdc3ac),damConcrete:proceduralMaterial(0xbdb6a5),darkConcrete:proceduralMaterial(0xa69c86),rock:proceduralMaterial(0xabb0ab,{rock:true}),
+  retaining:proceduralMaterial(0xc4b89c,{retaining:true,roughness:.9}), // 大面积米黄色喷混凝土护面
   asphalt:new THREE.MeshStandardMaterial({color:0x878f89,roughness:.94}),rail:new THREE.MeshStandardMaterial({color:0x9ca9a7,roughness:.48,metalness:.68}),
   gate:new THREE.MeshStandardMaterial({color:0x34464a,roughness:.68,metalness:.5,side:THREE.DoubleSide}),sealed:proceduralMaterial(0xa6afa4),
   red:new THREE.MeshStandardMaterial({color:0xbd251d,roughness:.48,metalness:.35}),glass:new THREE.MeshStandardMaterial({color:0x305060,roughness:.18,metalness:.35}),

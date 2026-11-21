@@ -48,6 +48,7 @@
 !/scripts/publish.mjs
 !/scripts/github-login.mjs
 !/scripts/gh-path.mjs
+!/scripts/record-video.mjs
 !/白鹤滩-坝库一体场景.html
 !/白鹤滩-高精度场景.html
 **/.env*

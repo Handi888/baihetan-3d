@@ -40,7 +40,9 @@ const tier=detectTier();
 const reflectionSize=tier==='high'?768:512;
 let renderer;
 // 截图前会同步重绘，不必让浏览器永久保留上一帧颜色缓冲。
-try{renderer=new THREE.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:false,powerPreference:'high-performance'});}
+// 影片模式（软件逐帧渲染）关闭 MSAA，以 2 倍超采样后缩小代替。
+const cineMode=new URLSearchParams(location.search).get('cine')==='1';
+try{renderer=new THREE.WebGLRenderer({canvas,antialias:!cineMode,preserveDrawingBuffer:false,powerPreference:'high-performance'});}
 catch(e){$('#loading').innerHTML='<strong>无法初始化 WebGL</strong><small>微信/QQ 内核过旧或未开启硬件加速，请点右上角“···”用系统浏览器打开，或升级 App</small>';throw e;}
 renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.02;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.debug.onShaderError=(gl,program,vs,fs)=>{const message=gl.getShaderInfoLog(fs)||gl.getProgramInfoLog(program);errors.push(message);console.error('Unified scene shader error:',message);};
@@ -94,10 +96,10 @@ function setQuality(q){quality=q;$('#quality').value=q;const size=P.quality[q].s
   for(const mat of changed)mat.needsUpdate=true;resize();
 }
 const labelDefs=[
-  {text:'坝顶弧长',small:'709 m',p:damPoint(-.52,306)},
-  {text:'双曲拱坝',small:'H ≈ 289 m',p:damPoint(.38,153,-1,-6)},
-  {text:'上游水库',small:'高水位',p:[-95,P.water.upstream+10,-510]},
-  {text:'下游河道',small:'低水位',p:[12,P.water.downstream+10,480]},
+  {text:'坝顶弧长',small:'709 m · 坝顶 834 m',p:damPoint(-.52,306)},
+  {text:'双曲拱坝',small:'最大坝高 289 m',p:damPoint(.38,153,-1,-6)},
+  {text:'上游水库',small:'正常蓄水位 825 m',p:[-95,P.water.upstream+10,-510]},
+  {text:'下游河道',small:'尾水约 570–600 m',p:[12,P.water.downstream+10,480]},
   {text:'深孔出口',small:'7 孔',p:damPoint(.06,218,-1,-8)},
 ];
 const labels=labelDefs.map(d=>{const el=document.createElement('div');el.className='label';el.innerHTML=d.text+'<small>'+d.small+'</small>';$('#labels').append(el);return {...d,el,v:new THREE.Vector3(...d.p)};});
@@ -157,12 +159,14 @@ $('#exit-walk').onclick=()=>walker.stop();
 powerhouse=installPowerhouse({scene,renderer,rig,canvas,dam,terrain,
   beforeEnter:()=>{walker.stop();},
   onExit:()=>{resize();reflections.invalidate();}});
+// 影片模式：由录制脚本逐帧驱动（scripts/record-video.mjs），不影响普通浏览。
+if(query.get('cine')==='1'){const {installCinematic}=await import('./cinematic.js');window.baihetanCine=installCinematic({scene,renderer,rig,terrain,dam,water,district,buildings,creatures,effects,lighting,reflections,occlusion});}
 if(query.get('view')==='powerhouse')await loadingStage('正在构建地下厂房',()=>powerhouse.enter(['hall','unit'].includes(query.get('lesson'))?query.get('lesson'):'system'));
 await loadingStage('正在准备材质',()=>renderer.compileAsync(scene,rig.camera));
 let last=null,frame=0,frameSum=0,frameSamples=0;
 // 首帧从 RAF 自己的时间戳开始计时。模块微任务中构建机组时，RAF 时间戳可能
 // 早于脚本中的 performance.now()；负 dt 会令水路粒子的曲线参数越界。
-function animate(now){requestAnimationFrame(animate);const elapsed=last===null?0:Math.max(0,(now-last)/1000),dt=Math.min(.06,elapsed);last=now;if(!paused)time+=elapsed;
+function animate(now){requestAnimationFrame(animate);if(window.__cineActive)return;const elapsed=last===null?0:Math.max(0,(now-last)/1000),dt=Math.min(.06,elapsed);last=now;if(!paused)time+=elapsed;
   if(powerhouse.active){
     powerhouse.update(dt);
     // 大厅是闭合室内视图，外景已隐藏；不用重复绘制山谷深度、水面与透明山体。

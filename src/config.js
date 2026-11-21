@@ -1,21 +1,26 @@
-// Model metres, Y up; +Z downstream. Only height and crest arc length are scale anchors.
+// Model metres, Y up; +Z downstream. 高程基准：模型 y=0 对应建基面高程 545 m，
+// 因而 y = 实际高程 − 545（坝顶 834 m → 289，正常蓄水位 825 m → 280）。
+export const DATUM=545;
+export const elevation=y=>y+DATUM, modelY=elevation=>elevation-DATUM;
 export const PARAMS = {
   dam: {
     height: 289, crestArcLength: 709,
     halfAngle: 1.05, // radians: approximate horizontal curvature, NOT a surveyed angle
-    topThickness: 14, bottomThickness: 64,
+    topThickness: 14, bottomThickness: 72, // 公开资料：坝顶厚 14 m，拱冠梁底厚 72 m
     baseHalfWidth: 82, verticalLean: 100, verticalBow: 18,
     thicknessExponent: 1.45, spanExponent: 0.86,
     horizontalSegments: 360, verticalSegments: 144,
   },
   water: {
-    upstream: 259, downstream: 24, // relative to model base, NOT sea level; mesh follows terrain triangulation
+    upstream: 280, downstream: 24, // 正常蓄水位 825 m；下游取枯水期尾水约 569 m（下游溪洛渡低水位时）
+    // 真实特征水位（m）：用于讲解与运行参数计算，不改变网格。
+    levels: { normal: 825, dead: 765, floodLimit: 785, crest: 834, foundation: 545, tailwaterLow: 569, tailwaterHigh: 600 },
     // Visual approximation from water-detail-01.jpg; colours are sRGB inputs.
     appearance: {
-      deepColor: '#0d6372', shallowColor: '#4b9180',
-      downstreamColor: '#137b78', downstreamShallow: '#60a69a',
+      deepColor: '#095862', shallowColor: '#1d8c86', // 参考三峡官方渲染：深青绿色库水
+      downstreamColor: '#0c5468', downstreamShallow: '#21808a',
       horizonColor: '#8fc6ee', zenithColor: '#70acd3', bankColor: '#365b4b',
-      roughness: 0.19, ior: 1.333, brightness: 1.0, skyIntensity: 1.25,
+      roughness: 0.19, ior: 1.333, brightness: 1.0, skyIntensity: .55,
       waveSlope: 0.18, wavelengthScale: 1.1, speed: 0.6, absorptionDepth: 13,
       reflectionSize: 1536,
     },
@@ -46,9 +51,9 @@ export const PARAMS = {
 export const PRESETS = {
   engineering: {title:'电站工程全景',subtitle:'双曲拱坝 · 两岸高边坡 · 上游进水口与林覆山脊',eye:[-95,825,1430],target:[0,230,-65]},
   unified: {title:'坝库一体总览',subtitle:'同一模型 · 大坝、峡谷、库区与滨水公园',eye:[4200,7400,6600],target:[450,210,-2900]},
-  reservoir: {title:'上游湖湾',subtitle:'连通坝前的蓝绿湖面 · 梯田 · 远山与村落',eye:[135,363,-4100],target:[-110,339,-6400]},
-  park: {title:'滨水公园',subtitle:'库区岸线的一部分 · 白色廊架与乔灌草',eye:[-70,317,-4430],target:[-280,268,-4680]},
-  rockshore: {title:'库区岩岸',subtitle:'裸岩与植被入水 · 水面完整连续网格',eye:[-500,399,-5100],target:[-1400,419,-5660]},
+  reservoir: {title:'上游湖湾',subtitle:'连通坝前的蓝绿湖面 · 梯田 · 远山与村落',eye:[135,384,-4100],target:[-110,360,-6400]},
+  park: {title:'滨水公园',subtitle:'库区岸线的一部分 · 白色廊架与乔灌草',eye:[-70,338,-4430],target:[-280,289,-4680]},
+  rockshore: {title:'库区岩岸',subtitle:'裸岩与植被入水 · 水面完整连续网格',eye:[-500,420,-5100],target:[-1400,440,-5660]},
   downstream: { title:'下游全景', subtitle:'双曲拱坝 · 曲折支护挡墙 · 蓝绿河谷', eye:[110,620,1120], target:[0,210,-55] },
   upstream: { title:'上游视角', subtitle:'绿水 · 红色门机 · 阶梯开挖边坡', eye:[-285,640,-855], target:[0,224,-35] },
   overhead: { title:'坝顶俯瞰', subtitle:'709 米弧线与上下游落差', eye:[60,1070,270], target:[0,165,-75] },
