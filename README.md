@@ -68,6 +68,7 @@ HTML、CSS、JavaScript 与 Three.js 构建的互动场景。大坝、完整水�
 node scripts/record-video.mjs --out baihetan.mp4              # 全片
 node scripts/record-video.mjs --out part.mp4 --from 0 --to 30 # 分段
 node scripts/record-video.mjs --out still --stills 20,60,150  # 抽帧检查
+node scripts/record-video.mjs --frames frames --from 0 --to 91.5 --step 2  # 可续传：逐帧写 JPEG，中断后重跑会跳过已有帧
 ```
 
 需要本机已安装 Playwright（含 Chromium）和 ffmpeg。视频没有配音，靠画面字幕讲解。

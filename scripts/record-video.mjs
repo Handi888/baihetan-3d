@@ -22,7 +22,21 @@ await page.waitForFunction(()=>window.__APP_READY__&&window.baihetanCine,null,{t
 await page.evaluate(()=>{window.baihetan.setQuality('high');window.baihetanCine.prepare();});
 const {duration,FPS}=await page.evaluate(()=>({duration:window.baihetanCine.duration,FPS:window.baihetanCine.FPS}));
 const frameOf=async t=>Buffer.from((await page.evaluate(t=>window.baihetanCine.frame(t,.92),t)).split(',')[1],'base64');
-if(stills){
+const framesDir=arg('frames','');
+if(framesDir){
+  // 可续传：每帧单独写成 JPEG，已存在的帧跳过；--step 2 表示隔帧渲染（之后用运动插帧补齐）。
+  const {mkdir,access}=await import('node:fs/promises');await mkdir(framesDir,{recursive:true});
+  const from=Number(arg('from',0)),to=Math.min(duration,Number(arg('to',duration))),step=Number(arg('step',1));
+  const first=Math.round(from*FPS),last=Math.round(to*FPS);let seeked=false,started=Date.now(),done=0;
+  for(let i=first;i<last;i+=step){
+    const file=`${framesDir}/${String(i).padStart(5,'0')}.jpg`;
+    try{await access(file);continue;}catch{}
+    if(!seeked){await page.evaluate(t=>window.baihetanCine.seek(t),Math.max(0,i-step)/FPS);if(i>0)await frameOf(Math.max(0,i-step)/FPS);seeked=true;}
+    await writeFile(file+'.tmp',await frameOf(i/FPS));const {rename}=await import('node:fs/promises');await rename(file+'.tmp',file);done++;
+    if(done%10===0)console.log(`frame ${i}/${last} t=${(i/FPS).toFixed(1)}s ${((Date.now()-started)/done).toFixed(0)} ms/frame`);
+  }
+  console.log('frames done',framesDir);
+}else if(stills){
   for(const t of stills.split(',').map(Number)){await page.evaluate(t=>window.baihetanCine.seek(t),t);await writeFile(`${out}-${t}.jpg`,await frameOf(t));console.log('still',t);}
 }else{
   const from=Number(arg('from',0)),to=Math.min(duration,Number(arg('to',duration)));
