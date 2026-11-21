@@ -9,12 +9,12 @@ import {reservoirChannelX} from './math.js';
  * 432 m 以下支护、山间公路及平台；原有墙层、道路和水面完全保留。 */
 export function createCanyonForest(){
   const group=new THREE.Group();group.name='Canyon natural ridge forest';
-  const random=rng(20261027),cells=new Map(),palette=[0x95ad76,0x86a069,0xa4b982,0x77945f,0xb4c58c];
+  const random=rng(20261027),cells=new Map(),palette=[0x4d7a37,0x3c6a2d,0x5e8a40,0x34602a,0x6b9447]; // 深绿阔叶林，接近官方渲染
   const roads=[];for(const side of [-1,1])for(let i=0;i<=280;i++){const t=i/280,z=80-570*Math.cos(t*Math.PI*3),y=343+t*170;roads.push([groundShoreline(z,y,side),z]);}
-  for(let i=0;i<36000;i++){
+  for(let i=0;i<52000;i++){
     const side=i%2?-1:1,z=-3500+random()*5200,engineered=z>-1050&&z<1100,base=engineered?438:(z<0?275:48);
     const edge=groundShoreline(z,base,side,z<-1800?reservoirChannelX(z):undefined),x=edge+side*(18+random()*520),y=groundHeight(x,z);
-    if(!withinMap(x,z,160)||y<(engineered?438:base+3)||noise(x*.009,z*.009)<.30||random()>.84)continue;
+    if(!withinMap(x,z,160)||y<(engineered?438:base+3)||noise(x*.009,z*.009)<.2||random()>.9)continue;
     // 保留岩脊、沟槽与不规则林窗，避免匀距的人工林效果。
     const slope=Math.hypot(groundHeight(x+3,z)-groundHeight(x-3,z),groundHeight(x,z+3)-groundHeight(x,z-3))/6;
     if(slope>2.5||roads.some(p=>Math.abs(z-p[1])<12&&Math.hypot(x-p[0],z-p[1])<11))continue;

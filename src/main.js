@@ -40,7 +40,9 @@ const tier=detectTier();
 const reflectionSize=tier==='high'?768:512;
 let renderer;
 // 截图前会同步重绘，不必让浏览器永久保留上一帧颜色缓冲。
-try{renderer=new THREE.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:false,powerPreference:'high-performance'});}
+// 影片模式（软件逐帧渲染）关闭 MSAA，以 2 倍超采样后缩小代替。
+const cineMode=new URLSearchParams(location.search).get('cine')==='1';
+try{renderer=new THREE.WebGLRenderer({canvas,antialias:!cineMode,preserveDrawingBuffer:false,powerPreference:'high-performance'});}
 catch(e){$('#loading').innerHTML='<strong>无法初始化 WebGL</strong><small>微信/QQ 内核过旧或未开启硬件加速，请点右上角“···”用系统浏览器打开，或升级 App</small>';throw e;}
 renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.02;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.debug.onShaderError=(gl,program,vs,fs)=>{const message=gl.getShaderInfoLog(fs)||gl.getProgramInfoLog(program);errors.push(message);console.error('Unified scene shader error:',message);};
@@ -157,12 +159,14 @@ $('#exit-walk').onclick=()=>walker.stop();
 powerhouse=installPowerhouse({scene,renderer,rig,canvas,dam,terrain,
   beforeEnter:()=>{walker.stop();},
   onExit:()=>{resize();reflections.invalidate();}});
+// 影片模式：由录制脚本逐帧驱动（scripts/record-video.mjs），不影响普通浏览。
+if(query.get('cine')==='1'){const {installCinematic}=await import('./cinematic.js');window.baihetanCine=installCinematic({scene,renderer,rig,terrain,dam,water,district,buildings,creatures,effects,lighting,reflections,occlusion});}
 if(query.get('view')==='powerhouse')await loadingStage('正在构建地下厂房',()=>powerhouse.enter(['hall','unit'].includes(query.get('lesson'))?query.get('lesson'):'system'));
 await loadingStage('正在准备材质',()=>renderer.compileAsync(scene,rig.camera));
 let last=null,frame=0,frameSum=0,frameSamples=0;
 // 首帧从 RAF 自己的时间戳开始计时。模块微任务中构建机组时，RAF 时间戳可能
 // 早于脚本中的 performance.now()；负 dt 会令水路粒子的曲线参数越界。
-function animate(now){requestAnimationFrame(animate);const elapsed=last===null?0:Math.max(0,(now-last)/1000),dt=Math.min(.06,elapsed);last=now;if(!paused)time+=elapsed;
+function animate(now){requestAnimationFrame(animate);if(window.__cineActive)return;const elapsed=last===null?0:Math.max(0,(now-last)/1000),dt=Math.min(.06,elapsed);last=now;if(!paused)time+=elapsed;
   if(powerhouse.active){
     powerhouse.update(dt);
     // 大厅是闭合室内视图，外景已隐藏；不用重复绘制山谷深度、水面与透明山体。

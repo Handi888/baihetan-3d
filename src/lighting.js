@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 export function createLighting(scene,renderer){
-  scene.background=new THREE.Color(0xbacbd4);scene.fog=new THREE.FogExp2(0xbacbd4,.00012);
+  scene.background=new THREE.Color(0xbacbd4);scene.fog=new THREE.FogExp2(0xbacbd4,.00008);
   const hemi=new THREE.HemisphereLight(0xd8e3e8,0x626256,.8);scene.add(hemi);
   // 顺着下游观察方向的高角度日光，使浅灰混凝土与深色破碎岩层可辨。
   const sun=new THREE.DirectionalLight(0xfff8ef,2.8);sun.position.set(-550,1900,1050);sun.target.position.set(0,100,-50);
